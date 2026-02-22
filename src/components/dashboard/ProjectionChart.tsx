@@ -13,13 +13,20 @@ import {
 } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
 import { ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { AssetProjection } from '@/lib/calculator'
 
 interface ProjectionChartProps {
   data: number[]
+  assetBreakdown?: AssetProjection[]
   fireNumber: number
   currencySymbol?: string
   currentAge?: number
 }
+
+const ASSET_COLORS = [
+  '#22c55e', '#3b82f6', '#f59e0b', '#8b5cf6',
+  '#ef4444', '#06b6d4', '#f97316', '#84cc16',
+]
 
 function formatYAxis(value: number, symbol = '$'): string {
   if (symbol === '₩') {
@@ -33,16 +40,48 @@ function formatYAxis(value: number, symbol = '$'): string {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const CustomTooltip = ({ active, payload, label, currencySymbol, currentAge }: any) => {
+const CustomTooltip = ({ active, payload, label, currencySymbol, currentAge, assetBreakdown }: any) => {
   if (active && payload && payload.length) {
     const age = currentAge + Math.round(label / 12)
     const years = (label / 12).toFixed(1)
+    const monthIndex = label - 1  // label = month (1-based)
+    const total = payload[0].value
+
+    const breakdown: { name: string; value: number; pct: number; color: string }[] =
+      (assetBreakdown ?? [])
+        .map((a: AssetProjection, i: number) => ({
+          name: a.name,
+          value: a.values[monthIndex] ?? 0,
+          pct: total > 0 ? Math.round(((a.values[monthIndex] ?? 0) / total) * 100) : 0,
+          color: ASSET_COLORS[i % ASSET_COLORS.length],
+        }))
+        .filter((a: { value: number }) => a.value > 0)
+        .sort((a: { value: number }, b: { value: number }) => b.value - a.value)
+
     return (
-      <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm shadow-lg">
-        <p className="text-gray-500 text-xs mb-1">{age}세 · +{years}년</p>
-        <p className="font-bold text-[#1c1c1e]">
-          {formatCurrency(payload[0].value, currencySymbol)}
+      <div className="bg-white border border-gray-200 rounded-lg px-3 py-2.5 text-sm shadow-lg min-w-[200px]">
+        <p className="text-gray-500 text-xs mb-1.5">{age}세 · +{years}년</p>
+        <p className="font-bold text-[#1c1c1e] mb-2">
+          {formatCurrency(total, currencySymbol)}
         </p>
+        {breakdown.length > 0 && (
+          <div className="space-y-1 border-t border-gray-100 pt-2">
+            {breakdown.map((a) => (
+              <div key={a.name} className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: a.color }} />
+                  <span className="text-xs text-gray-600 truncate">{a.name}</span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-xs font-medium text-[#1c1c1e]">
+                    {formatCurrency(a.value, currencySymbol)}
+                  </span>
+                  <span className="text-xs text-gray-400 w-8 text-right">{a.pct}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     )
   }
@@ -51,6 +90,7 @@ const CustomTooltip = ({ active, payload, label, currencySymbol, currentAge }: a
 
 export function ProjectionChart({
   data,
+  assetBreakdown,
   fireNumber,
   currencySymbol = '$',
   currentAge = 30,
@@ -220,7 +260,7 @@ export function ProjectionChart({
               width={64}
             />
             <Tooltip
-              content={<CustomTooltip currencySymbol={currencySymbol} currentAge={currentAge} />}
+              content={<CustomTooltip currencySymbol={currencySymbol} currentAge={currentAge} assetBreakdown={assetBreakdown} />}
             />
             {showFireLine && (
               <ReferenceLine

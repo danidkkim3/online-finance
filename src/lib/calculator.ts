@@ -190,15 +190,26 @@ export function fireProgressPct(netWorth: number, target: number): number {
   return Math.min(100, Math.max(0, (netWorth / target) * 100))
 }
 
-/** Project net worth over `months` months, tracking each asset individually */
-export function projectNetWorth(
+export interface AssetProjection {
+  name: string
+  assetClass: string
+  values: number[]  // one value per month
+}
+
+/** Full projection: net worth curve + per-asset breakdown for tooltip display */
+export function projectNetWorthDetailed(
   assets: Asset[],
   debts: Debt[],
   settings: Settings,
   months = 360,
   postRetirementMonthly = 0,
-): number[] {
+): { curve: number[]; assetBreakdown: AssetProjection[] } {
   const curve: number[] = []
+  const assetBreakdown: AssetProjection[] = assets.map((a) => ({
+    name: a.name,
+    assetClass: a.asset_class,
+    values: [],
+  }))
 
   // Track each asset's value separately so ROI and contributions compound correctly
   const assetValues = assets.map((a) => assetAfterTaxValue(a))
@@ -207,8 +218,7 @@ export function projectNetWorth(
   const totalBaseContrib = assetBaseContrib.reduce((s, c) => s + c, 0)
 
   // Surplus allocation follows contribution ratio (not asset value ratio).
-  // This means salary raises flow into the same assets you're actively investing in,
-  // naturally tipping the weighting over time (e.g. stocks 100% contrib → stocks get all raises).
+  // Salary raises flow into assets you're actively investing in, tipping the weighting over time.
   // Fallback to value weights if no contributions are set.
   const totalInitialValue = assetValues.reduce((s, v) => s + v, 0)
   const surplusWeights = assets.map((_, i) =>
@@ -225,13 +235,9 @@ export function projectNetWorth(
   const annualSalaryCap = settings.salary_cap ?? 0
   const currentAnnualSalary = settings.monthly_income * 12
 
-  // Retirement age overrides salary contributions
   const currentAge = settings.current_age ?? 30
   const retirementAge = settings.retirement_age ?? 60
   const retirementMonth = Math.max(0, (retirementAge - currentAge) * 12)
-
-  // For detecting FIRE crossing
-  const fireTarget = fireNumber(settings, postRetirementMonthly)
 
   for (let m = 0; m < months; m++) {
     const yearNum = Math.floor(m / 12)
@@ -259,14 +265,13 @@ export function projectNetWorth(
     // Step 3: add contributions to each asset
     for (let i = 0; i < assets.length; i++) {
       if (isRetired) {
-        // Post-retirement: base contributions stop, earned income allocated by contribution ratio
         assetValues[i] += postRetirementMonthly > 0
           ? postRetirementMonthly * inflationFactor * surplusWeights[i]
           : 0
       } else {
-        // Pre-retirement: base contribution + share of salary surplus
         assetValues[i] += assetBaseContrib[i] + surplus * surplusWeights[i]
       }
+      assetBreakdown[i].values.push(Math.round(assetValues[i]))
     }
 
     const portfolioValue = assetValues.reduce((s, v) => s + v, 0)
@@ -285,11 +290,9 @@ export function projectNetWorth(
         d.loan_term_months &&
         !d.manual_payment
       ) {
-        // Compute remaining term / grace from start date
         const elapsed = d.loan_start_date ? calcMonthsElapsed(d.loan_start_date) : 0
         const remainingTerm = Math.max(1, d.loan_term_months - elapsed)
         const remainingGrace = Math.max(0, (d.grace_period_months ?? 0) - elapsed)
-
         payment = mortgageMonthlyPayment(
           d.balance,
           d.annual_interest_rate,
@@ -306,19 +309,24 @@ export function projectNetWorth(
       const principalPaid = Math.max(0, Math.min(state.balance, payment - interest))
       state.balance = Math.max(0, state.balance - principalPaid)
       state.loanMonth++
-
       totalDebtBalance += state.balance
     }
 
-    const netValue = portfolioValue - totalDebtBalance
-    curve.push(netValue)
-
-    if (fireTarget > 0 && netValue >= fireTarget * Math.pow(1 + annualInflation, m / 12)) {
-      // FIRE crossing detected (used by dashboard for milestone display)
-    }
+    curve.push(portfolioValue - totalDebtBalance)
   }
 
-  return curve
+  return { curve, assetBreakdown }
+}
+
+/** Project net worth over `months` months (curve only) */
+export function projectNetWorth(
+  assets: Asset[],
+  debts: Debt[],
+  settings: Settings,
+  months = 360,
+  postRetirementMonthly = 0,
+): number[] {
+  return projectNetWorthDetailed(assets, debts, settings, months, postRetirementMonthly).curve
 }
 
 export interface Milestone {

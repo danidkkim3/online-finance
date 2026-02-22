@@ -6,7 +6,7 @@ import {
   totalNetWorth,
   monthlyPassiveIncome,
   fireNumber,
-  projectNetWorth,
+  projectNetWorthDetailed,
   assetAfterTaxValue,
   assetAfterTaxRoi,
 } from '@/lib/calculator'
@@ -50,8 +50,8 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
     return 0
   }, [settings])
   const target = useMemo(() => fireNumber(settings, postRetirementMonthly), [settings, postRetirementMonthly])
-  const projection = useMemo(
-    () => projectNetWorth(assets, debts, settings, 360, postRetirementMonthly),
+  const { curve: projection, assetBreakdown } = useMemo(
+    () => projectNetWorthDetailed(assets, debts, settings, 360, postRetirementMonthly),
     [assets, debts, settings, postRetirementMonthly],
   )
 
@@ -166,6 +166,7 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
             <CardContent>
               <ProjectionChart
                 data={projection}
+                assetBreakdown={assetBreakdown}
                 fireNumber={adjustedFireTarget}
                 currencySymbol={sym}
                 currentAge={currentAge}
