@@ -243,13 +243,34 @@ export function FinancialProfilePanel({ fireMonthIndex = -1 }: { fireMonthIndex?
 
                 <SliderRow
                   label="물가 상승률"
-                  tooltip="지출이 매년 이 비율만큼 증가합니다. FIRE 목표액도 이 비율로 조정되어 은퇴 시점의 실질 필요 자산을 계산합니다."
+                  tooltip="FIRE 목표액이 이 비율로 조정되어 은퇴 시점의 실질 필요 자산을 계산합니다."
                   value={settings.inflation_rate ?? 3}
                   displayValue={`${(settings.inflation_rate ?? 3).toFixed(1)}%/년`}
                   min={0}
                   max={10}
                   step={0.5}
                   onChange={(v) => updateSettings({ inflation_rate: v })}
+                  inputUnit={1}
+                  inputSuffix="%"
+                  inputStep={0.5}
+                />
+
+                <SliderRow
+                  label="연간 생활비 증가율"
+                  tooltip={`지출이 매년 이 비율만큼 증가합니다. 물가 상승률(${(settings.inflation_rate ?? 3).toFixed(1)}%)과 같으면 실질 생활 수준이 유지되고, 높으면 라이프스타일이 향상됩니다.`}
+                  value={settings.spending_growth_rate ?? settings.inflation_rate ?? 3}
+                  displayValue={(() => {
+                    const sgr = settings.spending_growth_rate ?? settings.inflation_rate ?? 3
+                    const inf = settings.inflation_rate ?? 3
+                    const diff = sgr - inf
+                    if (Math.abs(diff) < 0.05) return `${sgr.toFixed(1)}% (물가 수준 유지)`
+                    if (diff > 0) return `${sgr.toFixed(1)}% (라이프스타일 증가 +${diff.toFixed(1)}%)`
+                    return `${sgr.toFixed(1)}% (생활 축소 ${diff.toFixed(1)}%)`
+                  })()}
+                  min={0}
+                  max={15}
+                  step={0.5}
+                  onChange={(v) => updateSettings({ spending_growth_rate: v })}
                   inputUnit={1}
                   inputSuffix="%"
                   inputStep={0.5}

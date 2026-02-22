@@ -293,6 +293,7 @@ export function projectNetWorthDetailed(
 
   const annualSalaryGrowth = (settings.salary_growth_rate ?? 0) / 100
   const annualInflation = (settings.inflation_rate ?? 0) / 100
+  const annualSpendingGrowth = (settings.spending_growth_rate ?? settings.inflation_rate ?? 0) / 100
   const annualSalaryCap = settings.salary_cap ?? 0
   const currentAnnualSalary = settings.monthly_income * 12
 
@@ -337,7 +338,7 @@ export function projectNetWorthDetailed(
         ? Math.min(rawGrowthFactor, annualSalaryCap / currentAnnualSalary)
         : rawGrowthFactor
       const growthIncome = settings.monthly_income * salaryGrowthFactor
-      const growthSpend  = settings.monthly_spend  * inflationFactor
+      const growthSpend  = settings.monthly_spend  * Math.pow(1 + annualSpendingGrowth, yearNum)
       netFlow = growthIncome - growthSpend   // can be negative
     }
 

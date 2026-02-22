@@ -62,6 +62,7 @@ export interface Settings {
   salary_growth_rate: number  // annual % increase applied to contributions in projection
   salary_cap: number          // maximum annual salary (0 = no cap)
   inflation_rate: number      // annual % used to inflate the FIRE target over time
+  spending_growth_rate: number // annual % spending grows (defaults to inflation; set higher for lifestyle creep)
   retirement_work_hours: number  // weekly hours post-retirement (0 = not working, max 40)
   min_wage_monthly: number       // full-time (40 hr/week) monthly minimum wage
   retirement_age: number
