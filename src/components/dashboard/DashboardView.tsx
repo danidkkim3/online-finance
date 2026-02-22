@@ -99,6 +99,20 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
       })()
     : target > 0 ? '30년 이내 FIRE 달성 불가' : undefined
 
+  // Calendar date and age when FIRE is hit
+  const fireDateLabel = useMemo(() => {
+    if (fireMonthIndex < 0) return null
+    const now = new Date()
+    const d = new Date(now.getFullYear(), now.getMonth() + fireMonthIndex + 1, 1)
+    return `${d.getFullYear()}년 ${d.getMonth() + 1}월`
+  }, [fireMonthIndex])
+
+  const fireAgeLabel = useMemo(() => {
+    if (fireMonthIndex < 0) return null
+    const ageAtFire = currentAge + fireMonthIndex / 12
+    return `은퇴 나이 ${Math.round(ageAtFire)}세`
+  }, [fireMonthIndex, currentAge])
+
   return (
     <div className="p-4 md:p-8 space-y-5">
       {/* Privacy notice */}
@@ -126,13 +140,12 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
       )}
 
       {/* KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         <KpiCard
           label="순자산"
           tooltip="세후 자산 합계에서 부채 잔액 합계를 뺀 값입니다."
           value={formatCurrency(netWorth, sym)}
           subValue={adjustedFireTarget > 0 ? `FIRE까지 ${Math.min(100, Math.round((netWorth / adjustedFireTarget) * 100))}%` : undefined}
-          subValue2={timeToFire}
           featured
         />
         <KpiCard
@@ -178,6 +191,14 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
             savingsRate >= 20 ? 'yellow' :
             'red'
           }
+        />
+        <KpiCard
+          label="FIRE 예상 시점"
+          tooltip="현재 자산·수익률·납입 궤적 기준으로 FIRE 목표액에 도달하는 예상 연월입니다. 물가 상승률을 반영한 미래 목표액 기준으로 계산됩니다."
+          value={fireDateLabel ?? (target > 0 ? '달성 불가' : '-')}
+          subValue={fireDateLabel ? timeToFire ?? undefined : undefined}
+          subValue2={fireAgeLabel ?? undefined}
+          subValueColor={fireDateLabel ? 'green' : target > 0 ? 'red' : undefined}
         />
       </div>
 
