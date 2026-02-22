@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useMemo } from 'react'
 import { Debt } from '@/types'
 import { useStore } from '@/lib/store'
 import { formatCurrency, formatPct } from '@/lib/utils'
@@ -7,7 +8,7 @@ import { calcMonthsElapsed } from '@/lib/calculator'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Trash2, Building2, ChevronDown, ChevronUp } from 'lucide-react'
 
 const repaymentTypeLabels: Record<string, string> = {
   equal_payment: '원리금균등',
@@ -33,14 +34,132 @@ const debtClassLabels: Record<string, string> = {
   Other: '기타',
 }
 
+interface AmortRow {
+  year: number
+  propertyValue: number | null
+  startBalance: number
+  annualInterest: number
+  annualPrincipal: number
+  endBalance: number
+  equity: number | null
+  ltv: number | null
+}
+
+/** Build year-by-year amortization schedule from current state */
+function buildAmortization(debt: Debt, propertyValue: number | null, propertyRoi: number): AmortRow[] {
+  if (!debt.loan_term_months || debt.balance <= 0) return []
+
+  const elapsed = debt.loan_start_date ? calcMonthsElapsed(debt.loan_start_date) : 0
+  const grace = debt.grace_period_months ?? 0
+  const remainingTerm = Math.max(1, debt.loan_term_months - elapsed)
+  const remainingGrace = Math.max(0, grace - elapsed)
+  const repaymentTerm = Math.max(1, remainingTerm - remainingGrace)
+  const r = debt.annual_interest_rate / 100 / 12
+
+  // Pre-compute the monthly payment for the repayment phase.
+  // Grace period is interest-only so the balance entering repayment = debt.balance.
+  //
+  // Strategy: always compute the standard annuity formula when possible so that
+  // we're not dependent on debt.repayment_type being stored with a specific string value.
+  // Only skip the formula for equal_principal (handled separately) or manual override.
+  const annuityPayment = r === 0
+    ? debt.balance / repaymentTerm
+    : (debt.balance * r * Math.pow(1 + r, repaymentTerm)) / (Math.pow(1 + r, repaymentTerm) - 1)
+
+  const isEqualPrincipal = debt.repayment_type === 'equal_principal' && !debt.manual_payment
+  // Fixed principal chunk per month for equal_principal
+  const fixedPrincipalChunk = isEqualPrincipal ? debt.balance / repaymentTerm : 0
+
+  let repaymentPayment: number
+  if (debt.manual_payment) {
+    repaymentPayment = debt.monthly_payment
+  } else if (isEqualPrincipal) {
+    repaymentPayment = 0 // not used — handled via fixedPrincipalChunk
+  } else {
+    // equal_payment, graduated, or unknown — use annuity formula
+    repaymentPayment = annuityPayment
+  }
+
+  const rows: AmortRow[] = []
+  let balance = debt.balance
+  const totalYears = Math.ceil(remainingTerm / 12)
+
+  for (let yr = 1; yr <= totalYears; yr++) {
+    const startBalance = balance
+    let annualInterest = 0
+    let annualPrincipal = 0
+    const monthsThisYear = Math.min(12, remainingTerm - (yr - 1) * 12)
+
+    for (let mo = 0; mo < monthsThisYear; mo++) {
+      if (balance <= 0) break
+      // globalIdx: 0-based month index within the remaining schedule
+      const globalIdx = (yr - 1) * 12 + mo
+      const inGrace = globalIdx < remainingGrace
+      const interestCharge = balance * r
+
+      let principalPaid = 0
+      if (!inGrace) {
+        if (fixedPrincipalChunk > 0) {
+          // equal_principal: fixed principal regardless of interest
+          principalPaid = Math.min(balance, fixedPrincipalChunk)
+        } else {
+          principalPaid = Math.max(0, Math.min(balance, repaymentPayment - interestCharge))
+        }
+      }
+
+      annualInterest += interestCharge
+      annualPrincipal += principalPaid
+      balance = Math.max(0, balance - principalPaid)
+    }
+
+    const propVal = propertyValue !== null
+      ? propertyValue * Math.pow(1 + propertyRoi / 100, yr)
+      : null
+
+    rows.push({
+      year: yr,
+      propertyValue: propVal,
+      startBalance,
+      annualInterest,
+      annualPrincipal,
+      endBalance: balance,
+      equity: propVal !== null ? propVal - balance : null,
+      ltv: propVal !== null && propVal > 0 ? (balance / propVal) * 100 : null,
+    })
+
+    if (balance <= 0) break
+  }
+
+  return rows
+}
+
 interface DebtCardProps {
   debt: Debt
   onEdit: (debt: Debt) => void
 }
 
 export function DebtCard({ debt, onEdit }: DebtCardProps) {
-  const { deleteDebt, settings } = useStore()
+  const { deleteDebt, settings, assets } = useStore()
   const sym = settings.currency_symbol
+  const [showAmort, setShowAmort] = useState(false)
+
+  const linkedAsset = debt.linked_asset_id
+    ? assets.find((a) => a.id === debt.linked_asset_id)
+    : undefined
+
+  const equity = linkedAsset ? linkedAsset.current_value - debt.balance : null
+  const ltv = linkedAsset && linkedAsset.current_value > 0
+    ? (debt.balance / linkedAsset.current_value) * 100
+    : null
+
+  const amortRows = useMemo(() => {
+    if (!showAmort || debt.debt_class !== 'Mortgage') return []
+    return buildAmortization(
+      debt,
+      linkedAsset?.current_value ?? null,
+      linkedAsset?.annual_roi_pct ?? 0,
+    )
+  }, [showAmort, debt, linkedAsset])
 
   return (
     <Card className="bg-card border-border hover:border-primary/30 transition-colors group">
@@ -102,6 +221,35 @@ export function DebtCard({ debt, onEdit }: DebtCardProps) {
           </div>
         </div>
 
+        {/* Linked real estate asset — equity & LTV */}
+        {linkedAsset && (
+          <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 p-3 space-y-2">
+            <div className="flex items-center gap-1.5 text-amber-700 text-xs font-medium">
+              <Building2 className="w-3.5 h-3.5" />
+              {linkedAsset.name}
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-sm">
+              <div>
+                <p className="text-amber-700/60 text-xs">부동산 가치</p>
+                <p className="font-medium text-amber-900">{formatCurrency(linkedAsset.current_value, sym)}</p>
+              </div>
+              <div>
+                <p className="text-amber-700/60 text-xs">순 자산 (지분)</p>
+                <p className={`font-semibold ${equity !== null && equity >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                  {equity !== null ? formatCurrency(equity, sym) : '-'}
+                </p>
+              </div>
+              <div>
+                <p className="text-amber-700/60 text-xs">LTV</p>
+                <p className={`font-medium ${ltv !== null && ltv > 70 ? 'text-red-600' : 'text-amber-900'}`}>
+                  {ltv !== null ? `${ltv.toFixed(1)}%` : '-'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mortgage badges + status */}
         {debt.debt_class === 'Mortgage' && debt.repayment_type && (() => {
           const elapsed = debt.loan_start_date ? calcMonthsElapsed(debt.loan_start_date) : null
           const grace = debt.grace_period_months ?? 0
@@ -147,6 +295,61 @@ export function DebtCard({ debt, onEdit }: DebtCardProps) {
             </div>
           )
         })()}
+
+        {/* Amortization toggle */}
+        {debt.debt_class === 'Mortgage' && debt.balance > 0 && debt.loan_term_months && (
+          <button
+            onClick={() => setShowAmort((v) => !v)}
+            className="mt-3 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showAmort ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            {showAmort ? '상환 일정 닫기' : '연도별 상환 일정 보기'}
+          </button>
+        )}
+
+        {/* Amortization table */}
+        {showAmort && amortRows.length > 0 && (
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-border text-muted-foreground">
+                  <th className="text-left py-1.5 pr-3 font-medium">연차</th>
+                  {linkedAsset && <th className="text-right py-1.5 pr-3 font-medium">부동산 가치</th>}
+                  <th className="text-right py-1.5 pr-3 font-medium">연간 이자</th>
+                  <th className="text-right py-1.5 pr-3 font-medium">연간 원금</th>
+                  <th className="text-right py-1.5 pr-3 font-medium">잔액</th>
+                  {linkedAsset && <th className="text-right py-1.5 font-medium">지분 (Equity)</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {amortRows.map((row) => (
+                  <tr key={row.year} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                    <td className="py-1.5 pr-3 text-muted-foreground">{row.year}년차</td>
+                    {linkedAsset && (
+                      <td className="py-1.5 pr-3 text-right text-amber-700">
+                        {row.propertyValue !== null ? formatCurrency(Math.round(row.propertyValue), sym) : '-'}
+                      </td>
+                    )}
+                    <td className="py-1.5 pr-3 text-right text-red-500">
+                      {formatCurrency(Math.round(row.annualInterest), sym)}
+                    </td>
+                    <td className="py-1.5 pr-3 text-right text-blue-600">
+                      {formatCurrency(Math.round(row.annualPrincipal), sym)}
+                    </td>
+                    <td className="py-1.5 pr-3 text-right font-medium">
+                      {formatCurrency(Math.round(row.endBalance), sym)}
+                    </td>
+                    {linkedAsset && (
+                      <td className={`py-1.5 text-right font-medium ${row.equity !== null && row.equity >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {row.equity !== null ? formatCurrency(Math.round(row.equity), sym) : '-'}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

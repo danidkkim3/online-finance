@@ -153,6 +153,7 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
 
   const taxType = form.watch('tax_type')
   const assetClass = form.watch('asset_class')
+  const isRealEstate = assetClass === 'Real Estate'
 
   // Auto-fill default ROI and tax when asset class changes (new assets only)
   useEffect(() => {
@@ -324,26 +325,28 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="monthly_contribution"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>월 납입금 (₩)</FormLabel>
-                    <FormControl>
-                      <CommaInput
-                        value={field.value as number}
-                        onValueChange={field.onChange}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
-                        className="bg-input"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {!isRealEstate && (
+                <FormField
+                  control={form.control}
+                  name="monthly_contribution"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>월 납입금 (₩)</FormLabel>
+                      <FormControl>
+                        <CommaInput
+                          value={field.value as number}
+                          onValueChange={field.onChange}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                          className="bg-input"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}

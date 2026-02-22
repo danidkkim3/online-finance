@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useStore } from '@/lib/store'
 import { Debt, DebtClass, MortgageRepaymentType } from '@/types'
+import { Building2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -66,6 +67,7 @@ const schema = z.object({
   loan_start_date: z.string().optional(),
   manual_payment: z.boolean().optional(),
   original_loan_amount: z.coerce.number().min(0).optional(),
+  linked_asset_id: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -85,6 +87,7 @@ function makeDefaults(editDebt?: Debt): FormValues {
       loan_start_date: editDebt.loan_start_date ?? '',
       manual_payment: editDebt.manual_payment ?? false,
       original_loan_amount: editDebt.original_loan_amount ?? editDebt.balance,
+      linked_asset_id: editDebt.linked_asset_id ?? 'none',
     }
   }
   return {
@@ -100,6 +103,7 @@ function makeDefaults(editDebt?: Debt): FormValues {
     loan_start_date: '',
     manual_payment: false,
     original_loan_amount: 0,
+    linked_asset_id: 'none',
   }
 }
 
@@ -123,8 +127,9 @@ interface DebtFormProps {
 }
 
 export function DebtForm({ open, onClose, editDebt }: DebtFormProps) {
-  const { addDebt, updateDebt, settings } = useStore()
+  const { addDebt, updateDebt, settings, assets } = useStore()
   const sym = settings.currency_symbol
+  const realEstateAssets = assets.filter((a) => a.asset_class === 'Real Estate')
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -201,6 +206,7 @@ export function DebtForm({ open, onClose, editDebt }: DebtFormProps) {
       loan_start_date: isMortgage && values.loan_start_date ? values.loan_start_date : undefined,
       manual_payment: isMortgage ? values.manual_payment : undefined,
       original_loan_amount: isMortgage ? values.original_loan_amount : undefined,
+      linked_asset_id: isMortgage && values.linked_asset_id && values.linked_asset_id !== 'none' ? values.linked_asset_id : undefined,
     }
     if (editDebt) {
       updateDebt(editDebt.id, payload as Partial<Omit<Debt, 'id'>>)
@@ -254,6 +260,38 @@ export function DebtForm({ open, onClose, editDebt }: DebtFormProps) {
               {/* ── Mortgage-specific fields ── */}
               {isMortgage && (
                 <>
+                  {/* Linked real estate asset */}
+                  <FormField control={form.control} name="linked_asset_id" render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel className="flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5" />
+                        연결 부동산 자산
+                      </FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value ?? ''}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="bg-input">
+                            <SelectValue placeholder="선택 안 함 (선택 사항)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="bg-popover border-border">
+                          <SelectItem value="none">선택 안 함</SelectItem>
+                          {realEstateAssets.length === 0 && (
+                            <div className="px-3 py-2 text-xs text-muted-foreground">
+                              부동산 자산을 먼저 추가하세요
+                            </div>
+                          )}
+                          {realEstateAssets.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
                   {/* Repayment type */}
                   <FormField control={form.control} name="repayment_type" render={({ field }) => (
                     <FormItem className="col-span-2">

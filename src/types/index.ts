@@ -47,6 +47,7 @@ export interface Debt {
   loan_start_date?: string  // YYYY-MM-DD
   manual_payment?: boolean  // if true, use monthly_payment as-is instead of auto-calc
   original_loan_amount?: number  // initial principal at loan start
+  linked_asset_id?: string  // Real Estate asset this mortgage is secured against
 }
 
 export interface Settings {

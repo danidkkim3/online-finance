@@ -20,13 +20,27 @@ export function assetAfterTaxValue(asset: Asset): number {
   }
 }
 
-/** Effective annual ROI after accounting for flat-dollar tax drag */
+/**
+ * Effective annual ROI after applicable tax drag.
+ * - pct_total: tax reduces effective return each year (e.g. 이자소득세 on interest)
+ * - pct_appreciation: full ROI (tax deferred until sale — shown as gross rate)
+ * - flat_dollar: annual fixed tax divided by current value as a drag on ROI
+ */
 export function assetAfterTaxRoi(asset: Asset): number {
-  if (asset.tax_type === 'flat_dollar' && asset.current_value > 0) {
-    const drag = asset.tax_value / asset.current_value
-    return Math.max(0, asset.annual_roi_pct / 100 - drag)
+  switch (asset.tax_type) {
+    case 'pct_total':
+      return (asset.annual_roi_pct / 100) * (1 - asset.tax_value / 100)
+    case 'flat_dollar':
+      if (asset.current_value > 0) {
+        const drag = asset.tax_value / asset.current_value
+        return Math.max(0, asset.annual_roi_pct / 100 - drag)
+      }
+      return asset.annual_roi_pct / 100
+    case 'pct_appreciation':
+    default:
+      // Tax deferred; gross ROI shown for weighting purposes
+      return asset.annual_roi_pct / 100
   }
-  return asset.annual_roi_pct / 100
 }
 
 /**
@@ -211,20 +225,59 @@ export function projectNetWorthDetailed(
     values: [],
   }))
 
-  // Track each asset's value separately so ROI and contributions compound correctly
-  const assetValues = assets.map((a) => assetAfterTaxValue(a))
-  const assetMonthlyROI = assets.map((a) => assetAfterTaxRoi(a) / 12)
+  /**
+   * Tax timing model:
+   * - pct_appreciation: grow at full gross ROI, track cost basis; tax on gain deducted at output
+   * - pct_total: grow at roi*(1-tax_rate) each year (tax on income applied annually)
+   * - flat_dollar: grow at roi minus fixed-tax drag; tax already reflected in starting value
+   *
+   * assetValues stores:
+   *   pct_appreciation → gross (pre-tax) value
+   *   pct_total / flat_dollar → after-tax value
+   */
+  const assetValues = assets.map((a) =>
+    a.tax_type === 'pct_appreciation' ? a.current_value : assetAfterTaxValue(a)
+  )
+  // Cost basis tracked only for pct_appreciation (grows as contributions are added)
+  const assetCostBasis = assets.map((a) =>
+    a.tax_type === 'pct_appreciation' ? a.cost_basis : 0
+  )
+  // Monthly growth rate per asset (after applicable tax drag)
+  const assetMonthlyROI = assets.map((a) => {
+    if (a.tax_type === 'pct_total') {
+      return (a.annual_roi_pct / 100) * (1 - a.tax_value / 100) / 12
+    } else if (a.tax_type === 'flat_dollar') {
+      const afterTax = assetAfterTaxValue(a)
+      const drag = afterTax > 0 ? a.tax_value / afterTax : 0
+      return Math.max(0, a.annual_roi_pct / 100 - drag) / 12
+    } else {
+      // pct_appreciation: full ROI, tax deferred to display time
+      return a.annual_roi_pct / 100 / 12
+    }
+  })
+
+  /** After-tax display value for asset i given current assetValues/assetCostBasis */
+  function displayValue(i: number): number {
+    if (assets[i].tax_type === 'pct_appreciation') {
+      const gross = assetValues[i]
+      const gain = Math.max(0, gross - assetCostBasis[i])
+      return gross - gain * (assets[i].tax_value / 100)
+    }
+    return assetValues[i] // already after-tax
+  }
+
   const assetBaseContrib = assets.map((a) => a.monthly_contribution)
   const totalBaseContrib = assetBaseContrib.reduce((s, c) => s + c, 0)
 
   // Surplus allocation follows contribution ratio (not asset value ratio).
   // Salary raises flow into assets you're actively investing in, tipping the weighting over time.
   // Fallback to value weights if no contributions are set.
-  const totalInitialValue = assetValues.reduce((s, v) => s + v, 0)
+  const initialDisplayValues = assets.map((_, i) => displayValue(i))
+  const totalInitialValue = initialDisplayValues.reduce((s, v) => s + v, 0)
   const surplusWeights = assets.map((_, i) =>
     totalBaseContrib > 0
       ? assetBaseContrib[i] / totalBaseContrib
-      : totalInitialValue > 0 ? assetValues[i] / totalInitialValue : 0
+      : totalInitialValue > 0 ? initialDisplayValues[i] / totalInitialValue : 0
   )
 
   // Per-debt state for dynamic payment schedules
@@ -264,17 +317,23 @@ export function projectNetWorthDetailed(
 
     // Step 3: add contributions to each asset
     for (let i = 0; i < assets.length; i++) {
+      let contrib: number
       if (isRetired) {
-        assetValues[i] += postRetirementMonthly > 0
+        contrib = postRetirementMonthly > 0
           ? postRetirementMonthly * inflationFactor * surplusWeights[i]
           : 0
       } else {
-        assetValues[i] += assetBaseContrib[i] + surplus * surplusWeights[i]
+        contrib = assetBaseContrib[i] + surplus * surplusWeights[i]
       }
-      assetBreakdown[i].values.push(Math.round(assetValues[i]))
+      assetValues[i] += contrib
+      // New contributions are new cost basis for pct_appreciation assets
+      if (assets[i].tax_type === 'pct_appreciation') {
+        assetCostBasis[i] += contrib
+      }
+      assetBreakdown[i].values.push(Math.round(displayValue(i)))
     }
 
-    const portfolioValue = assetValues.reduce((s, v) => s + v, 0)
+    const portfolioValue = assets.reduce((s, _, i) => s + displayValue(i), 0)
 
     let totalDebtBalance = 0
     for (const state of debtStates) {
