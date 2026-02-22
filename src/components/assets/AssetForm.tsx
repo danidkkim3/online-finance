@@ -31,7 +31,6 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { useEffect } from 'react'
-import { InfoTooltip } from '@/components/ui/info-tooltip'
 
 const assetClasses: AssetClass[] = ['Cash', '예금', 'Stocks', 'Real Estate', 'Crypto', 'Bonds', 'Other']
 const assetClassLabels: Record<AssetClass, string> = {
@@ -80,16 +79,10 @@ const schema = z.object({
   cost_basis: z.coerce.number().min(0),
   monthly_contribution: z.coerce.number().min(0),
   notes: z.string(),
-  property_tax_pct: z.coerce.number().min(0).optional(),
-  jongbuse_pct: z.coerce.number().min(0).optional(),
+  property_tax_annual: z.coerce.number().min(0).optional(),
+  jongbuse_annual: z.coerce.number().min(0).optional(),
 })
 
-function defaultPropertyTaxRate(value: number): number {
-  if (value <= 60_000_000) return 0.1
-  if (value <= 150_000_000) return 0.15
-  if (value <= 300_000_000) return 0.25
-  return 0.4
-}
 
 export type FormValues = z.infer<typeof schema>
 
@@ -116,8 +109,8 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
           cost_basis: editAsset.cost_basis,
           monthly_contribution: editAsset.monthly_contribution,
           notes: editAsset.notes,
-          property_tax_pct: editAsset.property_tax_pct ?? defaultPropertyTaxRate(editAsset.current_value),
-          jongbuse_pct: editAsset.jongbuse_pct ?? 0,
+          property_tax_annual: editAsset.property_tax_annual ?? 0,
+          jongbuse_annual: editAsset.jongbuse_annual ?? 0,
         }
       : {
           name: '',
@@ -129,8 +122,8 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
           cost_basis: 0,
           monthly_contribution: 0,
           notes: '',
-          property_tax_pct: 0.1,
-          jongbuse_pct: 0,
+          property_tax_annual: 0,
+          jongbuse_annual: 0,
         },
   })
 
@@ -148,8 +141,8 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
               cost_basis: editAsset.cost_basis,
               monthly_contribution: editAsset.monthly_contribution,
               notes: editAsset.notes,
-              property_tax_pct: editAsset.property_tax_pct ?? defaultPropertyTaxRate(editAsset.current_value),
-              jongbuse_pct: editAsset.jongbuse_pct ?? 0,
+              property_tax_annual: editAsset.property_tax_annual ?? 0,
+              jongbuse_annual: editAsset.jongbuse_annual ?? 0,
             }
           : {
               name: '',
@@ -161,8 +154,8 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
               cost_basis: 0,
               monthly_contribution: 0,
               notes: '',
-              property_tax_pct: 0.1,
-              jongbuse_pct: 0,
+              property_tax_annual: 0,
+              jongbuse_annual: 0,
               ...prefillValues,
             },
       )
@@ -171,7 +164,6 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
 
   const taxType = form.watch('tax_type')
   const assetClass = form.watch('asset_class')
-  const currentValue = form.watch('current_value')
   const isRealEstate = assetClass === 'Real Estate'
 
   // Auto-fill default ROI and tax when asset class changes (new assets only)
@@ -184,18 +176,11 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
     }
   }, [assetClass]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-fill property tax rate when current_value changes (Real Estate only, new assets only)
-  useEffect(() => {
-    if (!editAsset && isRealEstate && currentValue >= 0) {
-      form.setValue('property_tax_pct', defaultPropertyTaxRate(currentValue))
-    }
-  }, [currentValue, isRealEstate]) // eslint-disable-line react-hooks/exhaustive-deps
-
   function onSubmit(values: FormValues) {
     const payload = {
       ...values,
-      property_tax_pct: isRealEstate ? (values.property_tax_pct ?? 0) : undefined,
-      jongbuse_pct: isRealEstate ? (values.jongbuse_pct ?? 0) : undefined,
+      property_tax_annual: isRealEstate ? (values.property_tax_annual ?? 0) : undefined,
+      jongbuse_annual: isRealEstate ? (values.jongbuse_annual ?? 0) : undefined,
     }
     if (editAsset) {
       updateAsset(editAsset.id, payload as Partial<Omit<Asset, 'id'>>)
@@ -383,15 +368,22 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
               {isRealEstate && (
                 <FormField
                   control={form.control}
-                  name="property_tax_pct"
+                  name="property_tax_annual"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>재산세율 (%)</FormLabel>
+                      <FormLabel>재산세 (연간 ₩)</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.05" min="0" {...field} className="bg-input" />
+                        <CommaInput
+                          value={field.value as number}
+                          onValueChange={field.onChange}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                          className="bg-input"
+                        />
                       </FormControl>
                       <FormDescription className="text-xs text-muted-foreground">
-                        6천만↓ 0.1% · ~1.5억 0.15% · ~3억 0.25% · 초과 0.4%
+                        실제 납부하는 연간 재산세 금액
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -401,20 +393,22 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
               {isRealEstate && (
                 <FormField
                   control={form.control}
-                  name="jongbuse_pct"
+                  name="jongbuse_annual"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="flex items-center gap-1">
-                        종부세율 (%)
-                        <InfoTooltip text={
-                          '부과 기준 (공시가격 합산)\n\n주택: 9억 원 초과 (1세대 1주택자는 12억 원 초과)\n토지(종합합산): 5억 원 초과\n토지(별도합산): 80억 원 초과\n\n주택 세율 (과세표준 기준)\n3억 이하: 0.5%\n3억~6억: 0.7%\n6억~12억: 1.0%\n12억~25억: 1.3%\n25억~50억: 1.5%\n50억~94억: 2.0%\n94억 초과: 2.7%'
-                        } />
-                      </FormLabel>
+                      <FormLabel>종부세 (연간 ₩)</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.1" min="0" {...field} className="bg-input" />
+                        <CommaInput
+                          value={field.value as number}
+                          onValueChange={field.onChange}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                          className="bg-input"
+                        />
                       </FormControl>
                       <FormDescription className="text-xs text-muted-foreground">
-                        기본값 0% · 해당 시 직접 입력
+                        해당 없으면 0 · 실제 납부액 입력
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

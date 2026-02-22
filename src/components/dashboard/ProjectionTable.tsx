@@ -20,7 +20,7 @@ interface ProjectionTableProps {
   salaryGrowthRate: number  // annual %, e.g. 3
   salaryCap: number         // 0 = no cap
   retirementAge: number
-  postRetirementWork: 'none' | 'half' | 'full'
+  retirementWorkHours: number  // 0 = no work, 1-40 weekly hours
   minWageMonthly: number
   inflationRate: number     // annual %, e.g. 2
 }
@@ -35,7 +35,7 @@ export function ProjectionTable({
   salaryGrowthRate,
   salaryCap,
   retirementAge,
-  postRetirementWork,
+  retirementWorkHours,
   minWageMonthly,
   inflationRate,
 }: ProjectionTableProps) {
@@ -47,7 +47,6 @@ export function ProjectionTable({
     const growthFactor = 1 + salaryGrowthRate / 100
     const inflationFactor = 1 + inflationRate / 100
     const currentAnnualSalary = monthlyIncome * 12
-    const workMultiplier = postRetirementWork === 'full' ? 1 : postRetirementWork === 'half' ? 0.5 : 0
     for (let y = 0; y < 30; y++) {
       const monthIndex = y * 12 + 11  // end of each year
       const netWorth = projection[monthIndex] ?? 0
@@ -55,7 +54,7 @@ export function ProjectionTable({
       const isRetired = age >= retirementAge
       let annualSalary: number
       if (isRetired) {
-        annualSalary = minWageMonthly * workMultiplier * Math.pow(inflationFactor, y + 1) * 12
+        annualSalary = minWageMonthly * (retirementWorkHours / 40) * Math.pow(inflationFactor, y + 1) * 12
       } else {
         const rawSalary = currentAnnualSalary * Math.pow(growthFactor, y + 1)
         annualSalary = salaryCap > 0 ? Math.min(rawSalary, salaryCap) : rawSalary
@@ -71,7 +70,7 @@ export function ProjectionTable({
       })
     }
     return years
-  }, [projection, fireNumber, currentAge, currentYear, monthlyIncome, salaryGrowthRate, salaryCap, retirementAge, postRetirementWork, minWageMonthly, inflationRate])
+  }, [projection, fireNumber, currentAge, currentYear, monthlyIncome, salaryGrowthRate, salaryCap, retirementAge, retirementWorkHours, minWageMonthly, inflationRate])
 
   // Find first FIRE year
   const fireRowIndex = rows.findIndex((r) => r.fireReached)
@@ -130,7 +129,7 @@ export function ProjectionTable({
                     </td>
                     <td className={`px-5 py-2.5 tabular-nums text-right ${isFireYear ? 'text-green-700' : row.isRetired ? 'text-blue-600' : 'text-muted-foreground'}`}>
                       {row.isRetired
-                        ? postRetirementWork === 'none'
+                        ? (retirementWorkHours ?? 0) === 0
                           ? '—'
                           : formatCurrency(Math.round(row.annualSalary), currencySymbol)
                         : monthlyIncome > 0

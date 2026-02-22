@@ -30,8 +30,8 @@ export interface Asset {
   cost_basis: number
   monthly_contribution: number
   notes: string
-  property_tax_pct?: number  // 재산세 — annual % of property value (Real Estate only)
-  jongbuse_pct?: number      // 종부세 — comprehensive real estate tax (Real Estate only)
+  property_tax_annual?: number  // 재산세 — annual flat amount in ₩ (Real Estate only)
+  jongbuse_annual?: number      // 종부세 — annual flat amount in ₩ (Real Estate only)
 }
 
 export interface Debt {
@@ -62,7 +62,7 @@ export interface Settings {
   salary_growth_rate: number  // annual % increase applied to contributions in projection
   salary_cap: number          // maximum annual salary (0 = no cap)
   inflation_rate: number      // annual % used to inflate the FIRE target over time
-  post_retirement_work: 'none' | 'half' | 'full'
-  min_wage_monthly: number
+  retirement_work_hours: number  // weekly hours post-retirement (0 = not working, max 40)
+  min_wage_monthly: number       // full-time (40 hr/week) monthly minimum wage
   retirement_age: number
 }

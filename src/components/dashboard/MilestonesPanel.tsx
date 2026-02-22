@@ -11,7 +11,6 @@ interface MilestonesPanelProps {
   fireNumber: number
   currentAge: number
   currencySymbol?: string
-  inflationRate?: number
 }
 
 function formatThreshold(value: number, symbol: string): string {
@@ -32,11 +31,10 @@ export function MilestonesPanel({
   fireNumber,
   currentAge,
   currencySymbol = '$',
-  inflationRate = 0,
 }: MilestonesPanelProps) {
   const milestones = useMemo(
-    () => calculateMilestones(projection, fireNumber, currentAge, inflationRate),
-    [projection, fireNumber, currentAge, inflationRate],
+    () => calculateMilestones(projection, fireNumber, currentAge),
+    [projection, fireNumber, currentAge],
   )
 
   const currentNetWorth = projection[0] ?? 0

@@ -38,11 +38,13 @@ export function assetAfterTaxRoi(asset: Asset): number {
       return asset.annual_roi_pct / 100
     case 'pct_appreciation':
     default: {
-      // Tax deferred; gross ROI shown for weighting purposes
+      // Capital gains tax is deferred until sale.
+      // Annual holding taxes (재산세 + 종부세) are flat ₩ amounts; expressed as
+      // a drag on ROI so the effective return reflects what the property nets per year.
       const baseRoi = asset.annual_roi_pct / 100
-      // Subtract annual holding tax drag (재산세 + 종부세) for real estate
-      const holdingTax = (asset.property_tax_pct ?? 0) + (asset.jongbuse_pct ?? 0)
-      return baseRoi - holdingTax / 100
+      const holdingTaxAnnual = (asset.property_tax_annual ?? 0) + (asset.jongbuse_annual ?? 0)
+      const drag = asset.current_value > 0 ? holdingTaxAnnual / asset.current_value : 0
+      return Math.max(0, baseRoi - drag)
     }
   }
 }
@@ -255,7 +257,9 @@ export function projectNetWorthDetailed(
       const drag = afterTax > 0 ? a.tax_value / afterTax : 0
       return Math.max(0, a.annual_roi_pct / 100 - drag) / 12
     } else {
-      // pct_appreciation: full ROI, tax deferred to display time
+      // pct_appreciation: full gross ROI; capital gains tax deferred to display time.
+      // Holding taxes (재산세 + 종부세) are flat annual ₩ amounts deducted separately
+      // in the monthly loop below, so they come out of gains rather than principal.
       return a.annual_roi_pct / 100 / 12
     }
   })
@@ -301,26 +305,41 @@ export function projectNetWorthDetailed(
     const inflationFactor = Math.pow(1 + annualInflation, yearNum)
     const isRetired = m >= retirementMonth
 
-    // Step 1: grow each asset by its own ROI, then deduct annual property tax monthly
+    // Step 1: grow each asset by its gross monthly ROI, then deduct flat annual
+    // holding taxes (재산세 + 종부세) as a monthly charge — paid from gains, not principal.
     for (let i = 0; i < assets.length; i++) {
+      const prevValue = assetValues[i]
       assetValues[i] *= (1 + assetMonthlyROI[i])
-      const annualHoldingTaxPct = (assets[i].property_tax_pct ?? 0) + (assets[i].jongbuse_pct ?? 0)
-      if (annualHoldingTaxPct > 0) {
-        assetValues[i] -= assetValues[i] * (annualHoldingTaxPct / 100) / 12
+      const gain = assetValues[i] - prevValue
+      const holdingTaxMonthly = ((assets[i].property_tax_annual ?? 0) + (assets[i].jongbuse_annual ?? 0)) / 12
+      if (holdingTaxMonthly > 0) {
+        // Deduct from gains first; only spill into principal if taxes exceed monthly gain
+        assetValues[i] -= Math.min(holdingTaxMonthly, Math.max(0, gain))
       }
     }
 
-    // Step 2: calculate surplus (salary raises above base, net of inflation spend growth)
-    let surplus = 0
-    if (!isRetired) {
+    // Step 2: determine net savings available this month.
+    //
+    // When monthly_income > 0:
+    //   netSavings = income×salaryGrowth − spend×inflation  (floored at 0)
+    //
+    //   Three regimes:
+    //   a) netSavings <= 0               → invest nothing
+    //   b) netSavings < totalBaseContrib → scale every contribution proportionally
+    //                                      so their sum equals netSavings exactly
+    //   c) netSavings >= totalBaseContrib → invest full per-asset amounts;
+    //                                      any excess (salary raise) distributed by surplusWeights
+    //
+    // When monthly_income is not set → legacy: use per-asset amounts as-is.
+    let netSavings = -1  // sentinel: income not configured
+    if (!isRetired && settings.monthly_income > 0) {
       const rawGrowthFactor = Math.pow(1 + annualSalaryGrowth, yearNum)
       const salaryGrowthFactor = annualSalaryCap > 0 && currentAnnualSalary > 0
         ? Math.min(rawGrowthFactor, annualSalaryCap / currentAnnualSalary)
         : rawGrowthFactor
-      // FIRE: income grows with salary, spend grows with inflation only (no lifestyle creep)
-      const incomeGrowth = settings.monthly_income * (salaryGrowthFactor - 1)
-      const spendGrowth = settings.monthly_spend * (inflationFactor - 1)
-      surplus = Math.max(0, incomeGrowth - spendGrowth)
+      const growthIncome = settings.monthly_income * salaryGrowthFactor
+      const growthSpend  = settings.monthly_spend  * inflationFactor
+      netSavings = Math.max(0, growthIncome - growthSpend)
     }
 
     // Step 3: add contributions to each asset
@@ -330,8 +349,21 @@ export function projectNetWorthDetailed(
         contrib = postRetirementMonthly > 0
           ? postRetirementMonthly * inflationFactor * surplusWeights[i]
           : 0
+      } else if (netSavings >= 0) {
+        // Income-aware path
+        if (netSavings <= 0) {
+          contrib = 0
+        } else if (totalBaseContrib > 0 && netSavings < totalBaseContrib) {
+          // Scale contributions down proportionally — zero sum with available savings
+          contrib = assetBaseContrib[i] * (netSavings / totalBaseContrib)
+        } else {
+          // Full contributions; distribute any excess (salary raise above base) by surplusWeights
+          const excess = netSavings - totalBaseContrib
+          contrib = assetBaseContrib[i] + excess * surplusWeights[i]
+        }
       } else {
-        contrib = assetBaseContrib[i] + surplus * surplusWeights[i]
+        // Legacy fallback: income not configured, use per-asset contributions as-is
+        contrib = assetBaseContrib[i]
       }
       assetValues[i] += contrib
       // New contributions are new cost basis for pct_appreciation assets
@@ -408,20 +440,18 @@ export function calculateMilestones(
   projection: number[],
   fireNumber: number,
   currentAge: number,
-  inflationRate = 0, // annual %, e.g. 2 for 2%
 ): Milestone[] {
   const baseThresholds = [50_000_000, 100_000_000, 300_000_000, 500_000_000, 1_000_000_000, 3_000_000_000]
   const thresholdSet = new Set(baseThresholds)
   if (fireNumber > 0) thresholdSet.add(fireNumber)
   const thresholds = Array.from(thresholdSet).sort((a, b) => a - b)
-  const r = inflationRate / 100
 
   return thresholds.map((threshold) => {
     const isFire = fireNumber > 0 && threshold === fireNumber
-    // For the FIRE milestone, the target grows with inflation each month
-    const monthIndex = isFire && r > 0
-      ? projection.findIndex((v, i) => v >= threshold * Math.pow(1 + r, i / 12))
-      : projection.findIndex((v) => v >= threshold)
+    // The FIRE threshold (adjustedFireTarget) is already inflation-adjusted by the caller,
+    // so search it as a static value — no further inflation compounding needed here.
+    // Non-FIRE milestones are fixed nominal amounts; also searched as static values.
+    const monthIndex = projection.findIndex((v) => v >= threshold)
 
     if (monthIndex === -1) {
       return { threshold, age: null, yearsFromNow: null, isFire }

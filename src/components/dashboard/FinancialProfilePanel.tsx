@@ -68,11 +68,11 @@ function SliderRow({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2 text-sm">
-        <span className="flex items-center gap-1 text-muted-foreground shrink-0">
+        <span className="flex items-center gap-1 text-muted-foreground min-w-0">
           {label}
           {tooltip && <InfoTooltip text={tooltip} />}
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <input
             type="text"
             inputMode="decimal"
@@ -103,7 +103,7 @@ function SliderRow({
   )
 }
 
-export function FinancialProfilePanel() {
+export function FinancialProfilePanel({ fireMonthIndex = -1 }: { fireMonthIndex?: number }) {
   const { settings, updateSettings } = useStore()
   const sym = settings.currency_symbol
   const isKrw = sym === '₩'
@@ -354,74 +354,115 @@ export function FinancialProfilePanel() {
               </div>
             </div>
 
+            {/* Work / No-work toggle */}
             <div className="flex rounded-md border border-border overflow-hidden text-xs">
-              {(['none', 'half', 'full'] as const).map((opt) => {
-                const labels = { none: '비근로', half: '최저임금 50%', full: '최저임금 100%' }
-                const active = (settings.post_retirement_work ?? 'none') === opt
+              {([false, true] as const).map((works) => {
+                const active = works
+                  ? (settings.retirement_work_hours ?? 0) > 0
+                  : (settings.retirement_work_hours ?? 0) === 0
                 return (
                   <button
-                    key={opt}
-                    onClick={() => updateSettings({ post_retirement_work: opt })}
+                    key={String(works)}
+                    onClick={() => updateSettings({ retirement_work_hours: works ? 20 : 0 })}
                     className={`flex-1 px-2 py-1.5 transition-colors ${active ? 'bg-primary text-primary-foreground font-medium' : 'text-muted-foreground hover:bg-gray-100'}`}
                   >
-                    {labels[opt]}
+                    {works ? '근로' : '비근로'}
                   </button>
                 )
               })}
             </div>
 
-            {(settings.post_retirement_work ?? 'none') !== 'none' && (
-              <SliderRow
-                label="최저임금 (월)"
-                tooltip="은퇴 후 파트타임 근로 시 기준이 되는 월 최저임금입니다."
-                value={settings.min_wage_monthly ?? 2_060_740}
-                displayValue={isKrw ? formatKrwAnnual(settings.min_wage_monthly ?? 2_060_740) : formatCurrency(settings.min_wage_monthly ?? 2_060_740, sym)}
-                min={isKrw ? 500_000 : 500}
-                max={isKrw ? 10_000_000 : 20_000}
-                step={isKrw ? 10_000 : 100}
-                onChange={(v) => updateSettings({ min_wage_monthly: v })}
-                inputUnit={isKrw ? 10_000 : 1_000}
-                inputSuffix={isKrw ? '만원' : 'k'}
-                inputStep={1}
-              />
-            )}
+            {(settings.retirement_work_hours ?? 0) > 0 && (() => {
+              const hours = settings.retirement_work_hours ?? 20
+              const minWage = settings.min_wage_monthly ?? 2_096_270
+              const currentMonthly = Math.round(minWage * hours / 40)
+              const yearsToRetirement = Math.max(0, (settings.retirement_age ?? 60) - (settings.current_age ?? 30))
+              const inflation = (settings.inflation_rate ?? 3) / 100
+              const adjustedMinWage = Math.round(minWage * Math.pow(1 + inflation, yearsToRetirement))
+              const adjustedMonthly = Math.round(adjustedMinWage * hours / 40)
+
+              return (
+                <div className="space-y-3 pt-1">
+                  <SliderRow
+                    label="주당 근무 시간"
+                    tooltip="은퇴 후 매주 일하는 시간입니다. 최저임금 기준으로 월 소득이 계산됩니다."
+                    value={hours}
+                    displayValue={`${hours}시간/주`}
+                    min={1}
+                    max={40}
+                    step={1}
+                    onChange={(v) => updateSettings({ retirement_work_hours: v })}
+                    inputUnit={1}
+                    inputSuffix="시간"
+                    inputStep={1}
+                  />
+                  <SliderRow
+                    label="최저임금 (월, 40시간 기준)"
+                    tooltip="주 40시간 풀타임 기준 월 최저임금입니다. 선택한 근무 시간에 비례해 소득이 계산됩니다."
+                    value={minWage}
+                    displayValue={isKrw ? formatKrwAnnual(minWage) : formatCurrency(minWage, sym)}
+                    min={isKrw ? 500_000 : 500}
+                    max={isKrw ? 10_000_000 : 20_000}
+                    step={isKrw ? 10_000 : 100}
+                    onChange={(v) => updateSettings({ min_wage_monthly: v })}
+                    inputUnit={isKrw ? 10_000 : 1_000}
+                    inputSuffix={isKrw ? '만원' : 'k'}
+                    inputStep={1}
+                  />
+                  <p className="text-xs text-muted-foreground text-right -mt-1">
+                    현재 기준 월 {formatCurrency(currentMonthly, sym)} ({hours}시간/주)
+                  </p>
+                  {/* Inflation-adjusted summary */}
+                  <div className="rounded-lg bg-muted/50 border border-border/60 px-3 py-2 space-y-1 text-xs">
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>은퇴 시 물가 반영 최저임금 ({yearsToRetirement}년 후)</span>
+                      <span className="font-medium text-foreground">{formatCurrency(adjustedMinWage, sym)}/월</span>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>예상 월 근로소득 ({hours}시간/주)</span>
+                      <span className="font-semibold text-green-700">{formatCurrency(adjustedMonthly, sym)}/월</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
 
-          {/* Summary row */}
-          <div className="space-y-1 text-sm pt-1 border-t border-border/60">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                {fireGoalMode === 'total' ? '→ 월 패시브 인컴' : '→ 필요 총 자산'}
-              </span>
-              <span className="font-medium text-foreground">
-                {fireGoalMode === 'total'
-                  ? `${formatCurrency(settings.fire_monthly_goal, sym)}/월`
-                  : isKrw ? formatKrwAnnual(fireTarget) : formatCurrency(fireTarget, sym)}
-              </span>
-            </div>
-            {(settings.post_retirement_work ?? 'none') !== 'none' && (() => {
-              const minWage = settings.min_wage_monthly ?? 2_060_740
-              const earned = settings.post_retirement_work === 'full' ? minWage : minWage / 2
-              const adjustedGoal = Math.max(0, settings.fire_monthly_goal - earned)
-              const adjustedTarget = settings.safe_withdrawal_rate > 0
-                ? Math.round(adjustedGoal * 12 / (settings.safe_withdrawal_rate / 100))
-                : 0
-              return (
+          {/* Summary row — work income impact */}
+          {(settings.retirement_work_hours ?? 0) > 0 && (() => {
+            const hours = settings.retirement_work_hours ?? 0
+            const earned = (settings.min_wage_monthly ?? 2_096_270) * (hours / 40)
+            const adjustedGoal = Math.max(0, settings.fire_monthly_goal - earned)
+            const adjustedTarget = settings.safe_withdrawal_rate > 0
+              ? Math.round(adjustedGoal * 12 / (settings.safe_withdrawal_rate / 100))
+              : 0
+            const inflation = (settings.inflation_rate ?? 0) / 100
+            // Use the same FIRE month as the KPI card so both numbers are on identical footing
+            const yearsToFire = fireMonthIndex >= 0 ? fireMonthIndex / 12 : null
+            const inflationAdjustedTarget = inflation > 0 && yearsToFire !== null
+              ? Math.round(adjustedTarget * Math.pow(1 + inflation, yearsToFire))
+              : null
+            return (
+              <div className="pt-1 border-t border-border/60 space-y-0.5">
                 <div className="flex justify-between text-xs">
                   <span className="text-green-700">→ 근로소득 반영 후 필요 자산</span>
                   <span className="font-medium text-green-700">
                     {isKrw ? formatKrwAnnual(adjustedTarget) : formatCurrency(adjustedTarget, sym)}
                   </span>
                 </div>
-              )
-            })()}
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">월 저축액</span>
-              <span className={`font-medium ${settings.monthly_income > settings.monthly_spend ? 'text-green-600' : 'text-red-500'}`}>
-                {formatCurrency(settings.monthly_income - settings.monthly_spend, sym)}/월
-              </span>
-            </div>
-          </div>
+                {inflationAdjustedTarget !== null && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      물가 반영 ({Math.round(yearsToFire!)}년 후 FIRE 기준)
+                    </span>
+                    <span className="font-medium text-muted-foreground">
+                      {isKrw ? formatKrwAnnual(inflationAdjustedTarget) : formatCurrency(inflationAdjustedTarget, sym)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
 
       </CardContent>

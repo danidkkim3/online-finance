@@ -32,8 +32,8 @@ const defaultSettings: Settings = {
   salary_growth_rate: 5.0,
   salary_cap: 0,
   inflation_rate: 3.0,
-  post_retirement_work: 'none',
-  min_wage_monthly: 2_060_740,
+  retirement_work_hours: 0,
+  min_wage_monthly: 2_096_270,  // 2025 Korea minimum wage (₩/month, 40hr/week)
   retirement_age: 60,
 }
 

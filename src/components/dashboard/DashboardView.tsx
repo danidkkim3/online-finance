@@ -43,11 +43,9 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
     [netWorth, settings],
   )
   const postRetirementMonthly = useMemo(() => {
-    const work = settings.post_retirement_work ?? 'none'
-    const minWage = settings.min_wage_monthly ?? 2_060_740
-    if (work === 'full') return minWage
-    if (work === 'half') return minWage / 2
-    return 0
+    const hours = settings.retirement_work_hours ?? 0
+    if (hours <= 0) return 0
+    return (settings.min_wage_monthly ?? 2_096_270) * (hours / 40)
   }, [settings])
   const target = useMemo(() => fireNumber(settings, postRetirementMonthly), [settings, postRetirementMonthly])
   const { curve: projection, assetBreakdown } = useMemo(
@@ -55,16 +53,18 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
     [assets, debts, settings, postRetirementMonthly],
   )
 
-  const savingsRate = useMemo(() => {
-    if (settings.monthly_income <= 0) return null
-    // Split each debt payment into interest (true expense) + principal (net worth building = savings)
-    // Only subtract the interest portion — principal paydown counts as savings
+  const { savingsRate, monthlySavings } = useMemo(() => {
+    if (settings.monthly_income <= 0) return { savingsRate: null, monthlySavings: 0 }
+    // Only subtract debt interest — principal paydown builds net worth and counts as savings
     const monthlyInterest = debts.reduce((sum, d) => {
       const interest = d.balance * (d.annual_interest_rate / 100) / 12
-      return sum + Math.min(d.monthly_payment, interest) // cap at payment in case of overpay
+      return sum + Math.min(d.monthly_payment, interest)
     }, 0)
     const trueSavings = settings.monthly_income - settings.monthly_spend - monthlyInterest
-    return (trueSavings / settings.monthly_income) * 100
+    return {
+      savingsRate: (trueSavings / settings.monthly_income) * 100,
+      monthlySavings: trueSavings,
+    }
   }, [settings.monthly_income, settings.monthly_spend, debts])
 
   const weightedRoi = useMemo(() => {
@@ -74,10 +74,17 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
   }, [assets])
 
   const inflation = (settings.inflation_rate ?? 0) / 100
+
+  // Find the month when the portfolio crosses the inflation-growing FIRE target.
+  // The search inflates `target` (today's money) forward each month, so the portfolio
+  // must catch up to a target that keeps rising with inflation. No circular dependency:
+  // `target` is fixed in today's money; `fireMonthIndex` is just where the curves cross.
   const fireMonthIndex = target > 0
     ? projection.findIndex((v, i) => v >= target * Math.pow(1 + inflation, i / 12))
     : -1
 
+  // Inflate the target to the projected FIRE date — this correctly rises when spending
+  // pushes the FIRE date further out (more inflation compounding = larger nominal target).
   const adjustedFireTarget = fireMonthIndex >= 0 && inflation > 0
     ? Math.round(target * Math.pow(1 + inflation, fireMonthIndex / 12))
     : target
@@ -183,6 +190,7 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
                 savingsRate >= 20 ? 'yellow' :
                 'red'
               }
+              subValue2={savingsRate !== null ? `월 저축액 ${formatCurrency(Math.round(monthlySavings), sym)}` : undefined}
             />
           </div>
           {/* Page 2: remaining 2 cards */}
@@ -260,6 +268,7 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
             savingsRate >= 20 ? 'yellow' :
             'red'
           }
+          subValue2={savingsRate !== null ? `월 저축액 ${formatCurrency(Math.round(monthlySavings), sym)}` : undefined}
         />
         <KpiCard
           label="FIRE 예상 시점"
@@ -274,7 +283,7 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4">
         {/* Left: Financial Profile Panel */}
-        <FinancialProfilePanel />
+        <FinancialProfilePanel fireMonthIndex={fireMonthIndex} />
 
         {/* Right: Chart + Milestones */}
         <div className="space-y-4">
@@ -298,7 +307,6 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
             fireNumber={adjustedFireTarget}
             currentAge={currentAge}
             currencySymbol={sym}
-            inflationRate={settings.inflation_rate ?? 0}
           />
 
           <AllocationChart />
@@ -317,8 +325,8 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
           salaryGrowthRate={settings.salary_growth_rate ?? 0}
           salaryCap={settings.salary_cap ?? 0}
           retirementAge={settings.retirement_age ?? 60}
-          postRetirementWork={settings.post_retirement_work ?? 'none'}
-          minWageMonthly={settings.min_wage_monthly ?? 2_060_740}
+          retirementWorkHours={settings.retirement_work_hours ?? 0}
+          minWageMonthly={settings.min_wage_monthly ?? 2_096_270}
           inflationRate={settings.inflation_rate ?? 0}
         />
       )}
