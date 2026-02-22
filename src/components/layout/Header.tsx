@@ -2,6 +2,7 @@
 
 import { LayoutDashboard, Landmark, CreditCard, Settings, Flame } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { UserMenu } from '@/components/auth/UserMenu'
 
 export type Tab = 'dashboard' | 'assets' | 'debts' | 'settings'
 
@@ -77,6 +78,8 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
             )
           })}
         </nav>
+
+        <UserMenu />
       </div>
     </header>
   )
