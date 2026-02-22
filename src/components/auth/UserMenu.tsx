@@ -61,8 +61,7 @@ export function UserMenu() {
 
   async function handleSignOut() {
     await supabase.auth.signOut()
-    setOpen(false)
-    router.refresh()
+    window.location.href = '/'
   }
 
   if (!user) {
