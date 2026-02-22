@@ -190,7 +190,7 @@ export function fireProgressPct(netWorth: number, target: number): number {
   return Math.min(100, Math.max(0, (netWorth / target) * 100))
 }
 
-/** Project net worth over `months` months using weighted average ROI */
+/** Project net worth over `months` months, tracking each asset individually */
 export function projectNetWorth(
   assets: Asset[],
   debts: Debt[],
@@ -200,18 +200,22 @@ export function projectNetWorth(
 ): number[] {
   const curve: number[] = []
 
-  let portfolioValue = assets.reduce((sum, a) => sum + assetAfterTaxValue(a), 0)
-  const monthlyContribution = assets.reduce((sum, a) => sum + a.monthly_contribution, 0)
+  // Track each asset's value separately so ROI and contributions compound correctly
+  const assetValues = assets.map((a) => assetAfterTaxValue(a))
+  const assetMonthlyROI = assets.map((a) => assetAfterTaxRoi(a) / 12)
+  const assetBaseContrib = assets.map((a) => a.monthly_contribution)
+  const totalBaseContrib = assetBaseContrib.reduce((s, c) => s + c, 0)
 
-  // Weighted average monthly return
-  const totalVal = assets.reduce((sum, a) => sum + assetAfterTaxValue(a), 0)
-  let weightedMonthlyReturn = 0
-  if (totalVal > 0) {
-    for (const asset of assets) {
-      const weight = assetAfterTaxValue(asset) / totalVal
-      weightedMonthlyReturn += weight * (assetAfterTaxRoi(asset) / 12)
-    }
-  }
+  // Surplus allocation follows contribution ratio (not asset value ratio).
+  // This means salary raises flow into the same assets you're actively investing in,
+  // naturally tipping the weighting over time (e.g. stocks 100% contrib → stocks get all raises).
+  // Fallback to value weights if no contributions are set.
+  const totalInitialValue = assetValues.reduce((s, v) => s + v, 0)
+  const surplusWeights = assets.map((_, i) =>
+    totalBaseContrib > 0
+      ? assetBaseContrib[i] / totalBaseContrib
+      : totalInitialValue > 0 ? assetValues[i] / totalInitialValue : 0
+  )
 
   // Per-debt state for dynamic payment schedules
   const debtStates = debts.map((d) => ({ debt: d, balance: d.balance, loanMonth: 1 }))
@@ -226,33 +230,46 @@ export function projectNetWorth(
   const retirementAge = settings.retirement_age ?? 60
   const retirementMonth = Math.max(0, (retirementAge - currentAge) * 12)
 
-  // For detecting FIRE crossing (used for milestone display only)
+  // For detecting FIRE crossing
   const fireTarget = fireNumber(settings, postRetirementMonthly)
-  let fireReached = false
 
   for (let m = 0; m < months; m++) {
     const yearNum = Math.floor(m / 12)
     const inflationFactor = Math.pow(1 + annualInflation, yearNum)
     const isRetired = m >= retirementMonth
 
-    let contribution: number
-    if (isRetired) {
-      // After retirement: salary contributions stop, post-retirement income replaces them
-      contribution = postRetirementMonthly > 0 ? postRetirementMonthly * inflationFactor : 0
-    } else {
+    // Step 1: grow each asset by its own ROI
+    for (let i = 0; i < assets.length; i++) {
+      assetValues[i] *= (1 + assetMonthlyROI[i])
+    }
+
+    // Step 2: calculate surplus (salary raises above base, net of inflation spend growth)
+    let surplus = 0
+    if (!isRetired) {
       const rawGrowthFactor = Math.pow(1 + annualSalaryGrowth, yearNum)
-      // Cap the growth factor so projected salary never exceeds salary_cap
       const salaryGrowthFactor = annualSalaryCap > 0 && currentAnnualSalary > 0
         ? Math.min(rawGrowthFactor, annualSalaryCap / currentAnnualSalary)
         : rawGrowthFactor
-      // FIRE principle: income grows with salary, spend grows with inflation only (no lifestyle creep)
-      // contribution = base + income_raise_delta - inflation_spend_delta
+      // FIRE: income grows with salary, spend grows with inflation only (no lifestyle creep)
       const incomeGrowth = settings.monthly_income * (salaryGrowthFactor - 1)
       const spendGrowth = settings.monthly_spend * (inflationFactor - 1)
-      contribution = Math.max(0, monthlyContribution + incomeGrowth - spendGrowth)
+      surplus = Math.max(0, incomeGrowth - spendGrowth)
     }
 
-    portfolioValue = portfolioValue * (1 + weightedMonthlyReturn) + contribution
+    // Step 3: add contributions to each asset
+    for (let i = 0; i < assets.length; i++) {
+      if (isRetired) {
+        // Post-retirement: base contributions stop, earned income allocated by contribution ratio
+        assetValues[i] += postRetirementMonthly > 0
+          ? postRetirementMonthly * inflationFactor * surplusWeights[i]
+          : 0
+      } else {
+        // Pre-retirement: base contribution + share of salary surplus
+        assetValues[i] += assetBaseContrib[i] + surplus * surplusWeights[i]
+      }
+    }
+
+    const portfolioValue = assetValues.reduce((s, v) => s + v, 0)
 
     let totalDebtBalance = 0
     for (const state of debtStates) {
@@ -296,8 +313,8 @@ export function projectNetWorth(
     const netValue = portfolioValue - totalDebtBalance
     curve.push(netValue)
 
-    if (!fireReached && fireTarget > 0 && netValue >= fireTarget * Math.pow(1 + annualInflation, m / 12)) {
-      fireReached = true
+    if (fireTarget > 0 && netValue >= fireTarget * Math.pow(1 + annualInflation, m / 12)) {
+      // FIRE crossing detected (used by dashboard for milestone display)
     }
   }
 
