@@ -42,10 +42,17 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
     () => monthlyPassiveIncome(netWorth, settings),
     [netWorth, settings],
   )
-  const target = useMemo(() => fireNumber(settings), [settings])
+  const postRetirementMonthly = useMemo(() => {
+    const work = settings.post_retirement_work ?? 'none'
+    const minWage = settings.min_wage_monthly ?? 2_060_740
+    if (work === 'full') return minWage
+    if (work === 'half') return minWage / 2
+    return 0
+  }, [settings])
+  const target = useMemo(() => fireNumber(settings, postRetirementMonthly), [settings, postRetirementMonthly])
   const projection = useMemo(
-    () => projectNetWorth(assets, debts, settings, 360),
-    [assets, debts, settings],
+    () => projectNetWorth(assets, debts, settings, 360, postRetirementMonthly),
+    [assets, debts, settings, postRetirementMonthly],
   )
 
   const weightedRoi = useMemo(() => {
@@ -122,8 +129,8 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
           value={formatCurrency(adjustedFireTarget, sym)}
           subValue={
             inflation > 0 && fireMonthIndex >= 0
-              ? `오늘 기준 ${formatCurrency(settings.fire_monthly_goal, sym)}/월`
-              : `${formatCurrency(settings.fire_monthly_goal, sym)}/월 목표`
+              ? `오늘 기준 ${formatCurrency(Math.max(0, settings.fire_monthly_goal - postRetirementMonthly), sym)}/월`
+              : `${formatCurrency(Math.max(0, settings.fire_monthly_goal - postRetirementMonthly), sym)}/월 목표`
           }
           subValue2={
             inflation > 0 && fireMonthIndex >= 0
@@ -188,6 +195,10 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
           monthlyIncome={settings.monthly_income}
           salaryGrowthRate={settings.salary_growth_rate ?? 0}
           salaryCap={settings.salary_cap ?? 0}
+          retirementAge={settings.retirement_age ?? 60}
+          postRetirementWork={settings.post_retirement_work ?? 'none'}
+          minWageMonthly={settings.min_wage_monthly ?? 2_060_740}
+          inflationRate={settings.inflation_rate ?? 0}
         />
       )}
 

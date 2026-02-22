@@ -12,6 +12,10 @@ interface ProjectionTableProps {
   monthlyIncome: number
   salaryGrowthRate: number  // annual %, e.g. 3
   salaryCap: number         // 0 = no cap
+  retirementAge: number
+  postRetirementWork: 'none' | 'half' | 'full'
+  minWageMonthly: number
+  inflationRate: number     // annual %, e.g. 2
 }
 
 export function ProjectionTable({
@@ -22,28 +26,42 @@ export function ProjectionTable({
   monthlyIncome,
   salaryGrowthRate,
   salaryCap,
+  retirementAge,
+  postRetirementWork,
+  minWageMonthly,
+  inflationRate,
 }: ProjectionTableProps) {
   const currentYear = new Date().getFullYear()
 
   const rows = useMemo(() => {
-    const years: { year: number; age: number; netWorth: number; annualSalary: number; fireReached: boolean }[] = []
+    const years: { year: number; age: number; netWorth: number; annualSalary: number; fireReached: boolean; isRetired: boolean }[] = []
     const growthFactor = 1 + salaryGrowthRate / 100
+    const inflationFactor = 1 + inflationRate / 100
     const currentAnnualSalary = monthlyIncome * 12
+    const workMultiplier = postRetirementWork === 'full' ? 1 : postRetirementWork === 'half' ? 0.5 : 0
     for (let y = 0; y < 30; y++) {
       const monthIndex = y * 12 + 11  // end of each year
       const netWorth = projection[monthIndex] ?? 0
-      const rawSalary = currentAnnualSalary * Math.pow(growthFactor, y + 1)
-      const annualSalary = salaryCap > 0 ? Math.min(rawSalary, salaryCap) : rawSalary
+      const age = currentAge + y + 1
+      const isRetired = age >= retirementAge
+      let annualSalary: number
+      if (isRetired) {
+        annualSalary = minWageMonthly * workMultiplier * Math.pow(inflationFactor, y + 1) * 12
+      } else {
+        const rawSalary = currentAnnualSalary * Math.pow(growthFactor, y + 1)
+        annualSalary = salaryCap > 0 ? Math.min(rawSalary, salaryCap) : rawSalary
+      }
       years.push({
         year: currentYear + y + 1,
-        age: currentAge + y + 1,
+        age,
         netWorth,
         annualSalary,
         fireReached: fireNumber > 0 && netWorth >= fireNumber,
+        isRetired,
       })
     }
     return years
-  }, [projection, fireNumber, currentAge, currentYear, monthlyIncome, salaryGrowthRate, salaryCap])
+  }, [projection, fireNumber, currentAge, currentYear, monthlyIncome, salaryGrowthRate, salaryCap, retirementAge, postRetirementWork, minWageMonthly, inflationRate])
 
   // Find first FIRE year
   const fireRowIndex = rows.findIndex((r) => r.fireReached)
@@ -68,19 +86,29 @@ export function ProjectionTable({
             <tbody className="divide-y divide-border">
               {rows.map((row, i) => {
                 const isFireYear = i === fireRowIndex
+                const isRetirementYear = i > 0 && row.isRetired && !rows[i - 1].isRetired
                 return (
                   <tr
                     key={row.year}
-                    className={isFireYear ? 'bg-green-50' : 'hover:bg-muted/40 transition-colors'}
+                    className={isFireYear ? 'bg-green-50' : isRetirementYear ? 'bg-blue-50/50' : 'hover:bg-muted/40 transition-colors'}
                   >
                     <td className={`px-5 py-2.5 tabular-nums font-medium ${isFireYear ? 'text-green-700' : 'text-foreground'}`}>
                       {row.year}
+                      {isRetirementYear && (
+                        <span className="ml-2 text-xs font-normal text-blue-600 bg-blue-100 rounded-full px-2 py-0.5">은퇴</span>
+                      )}
                     </td>
                     <td className={`px-5 py-2.5 tabular-nums ${isFireYear ? 'text-green-700' : 'text-muted-foreground'}`}>
                       {row.age}세
                     </td>
-                    <td className={`px-5 py-2.5 tabular-nums text-right ${isFireYear ? 'text-green-700' : 'text-muted-foreground'}`}>
-                      {monthlyIncome > 0 ? formatCurrency(Math.round(row.annualSalary), currencySymbol) : '—'}
+                    <td className={`px-5 py-2.5 tabular-nums text-right ${isFireYear ? 'text-green-700' : row.isRetired ? 'text-blue-600' : 'text-muted-foreground'}`}>
+                      {row.isRetired
+                        ? postRetirementWork === 'none'
+                          ? '—'
+                          : formatCurrency(Math.round(row.annualSalary), currencySymbol)
+                        : monthlyIncome > 0
+                        ? formatCurrency(Math.round(row.annualSalary), currencySymbol)
+                        : '—'}
                     </td>
                     <td className={`px-5 py-2.5 tabular-nums text-right font-medium ${isFireYear ? 'text-green-700' : 'text-foreground'}`}>
                       {formatCurrency(row.netWorth, currencySymbol)}
