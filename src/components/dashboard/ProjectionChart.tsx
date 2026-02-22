@@ -260,7 +260,15 @@ export function ProjectionChart({
               width={64}
             />
             <Tooltip
-              content={<CustomTooltip currencySymbol={currencySymbol} currentAge={currentAge} assetBreakdown={assetBreakdown} />}
+              content={(props) => (
+                <CustomTooltip
+                  {...props}
+                  currencySymbol={currencySymbol}
+                  currentAge={currentAge}
+                  assetBreakdown={assetBreakdown}
+                />
+              )}
+              wrapperStyle={{ zIndex: 50 }}
             />
             {showFireLine && (
               <ReferenceLine
