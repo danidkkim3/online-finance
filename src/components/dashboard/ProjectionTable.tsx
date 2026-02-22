@@ -118,8 +118,6 @@ export function ProjectionTable({
                   <tr
                     key={row.year}
                     className={isFireYear ? 'bg-green-50' : isRetirementYear ? 'bg-blue-50/50' : 'hover:bg-muted/40 transition-colors'}
-                    onMouseEnter={() => setHoveredRow(i)}
-                    onMouseLeave={() => setHoveredRow(null)}
                   >
                     <td className={`px-5 py-2.5 tabular-nums font-medium ${isFireYear ? 'text-green-700' : 'text-foreground'}`}>
                       {row.year}
@@ -139,7 +137,11 @@ export function ProjectionTable({
                         ? formatCurrency(Math.round(row.annualSalary), currencySymbol)
                         : '—'}
                     </td>
-                    <td className={`px-5 py-2.5 tabular-nums text-right font-medium relative ${isFireYear ? 'text-green-700' : 'text-foreground'}`}>
+                    <td
+                      className={`px-5 py-2.5 tabular-nums text-right font-medium relative ${isFireYear ? 'text-green-700' : 'text-foreground'}`}
+                      onMouseEnter={() => setHoveredRow(i)}
+                      onMouseLeave={() => setHoveredRow(null)}
+                    >
                       {formatCurrency(row.netWorth, currencySymbol)}
 
                       {/* Asset breakdown popover */}
