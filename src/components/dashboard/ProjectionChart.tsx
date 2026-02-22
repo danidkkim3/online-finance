@@ -103,6 +103,7 @@ export function ProjectionChart({
   const total = allData.length
 
   const [view, setView] = useState({ startIndex: 0, endIndex: total - 1 })
+  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null)
 
   // Reset when projection length changes
   useEffect(() => {
@@ -236,7 +237,16 @@ export function ProjectionChart({
       {/* Chart — receives only the visible slice; recharts auto-fits Y naturally */}
       <div ref={containerRef} className="cursor-crosshair select-none">
         <ResponsiveContainer width="100%" height={260}>
-          <AreaChart data={displayData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <AreaChart
+            data={displayData}
+            margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+            onMouseMove={(state) => {
+              if (state.isTooltipActive && state.chartX != null && state.chartY != null) {
+                setMousePos({ x: state.chartX, y: state.chartY })
+              }
+            }}
+            onMouseLeave={() => setMousePos(null)}
+          >
             <defs>
               <linearGradient id="netWorthGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#22c55e" stopOpacity={0.25} />
@@ -268,6 +278,7 @@ export function ProjectionChart({
                   assetBreakdown={assetBreakdown}
                 />
               )}
+              position={mousePos ? { x: mousePos.x + 16, y: mousePos.y - 20 } : undefined}
               wrapperStyle={{ zIndex: 50 }}
             />
             {showFireLine && (
