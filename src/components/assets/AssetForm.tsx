@@ -53,6 +53,16 @@ const defaultRoi: Record<AssetClass, number> = {
   Other: 0,
 }
 
+const defaultTax: Record<AssetClass, { tax_type: TaxType; tax_value: number }> = {
+  Cash:           { tax_type: 'pct_appreciation', tax_value: 0 },    // 비과세
+  '예금':         { tax_type: 'pct_total',         tax_value: 15.4 }, // 이자소득세 15.4%
+  Stocks:         { tax_type: 'pct_appreciation',  tax_value: 22 },   // 양도소득세 22%
+  'Real Estate':  { tax_type: 'pct_appreciation',  tax_value: 22 },   // 양도소득세 22%
+  Crypto:         { tax_type: 'pct_appreciation',  tax_value: 22 },   // 가상자산 양도세 22%
+  Bonds:          { tax_type: 'pct_total',         tax_value: 15.4 }, // 이자소득세 15.4%
+  Other:          { tax_type: 'pct_appreciation',  tax_value: 0 },
+}
+
 const taxTypes: { value: TaxType; label: string }[] = [
   { value: 'pct_appreciation', label: '차익 대비 % (양도소득세)' },
   { value: 'pct_total', label: '총 가치 대비 %' },
@@ -101,9 +111,9 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
           name: '',
           asset_class: 'Stocks',
           current_value: 0,
-          annual_roi_pct: 7,
-          tax_type: 'pct_appreciation',
-          tax_value: 15,
+          annual_roi_pct: defaultRoi['Stocks'],
+          tax_type: defaultTax['Stocks'].tax_type,
+          tax_value: defaultTax['Stocks'].tax_value,
           cost_basis: 0,
           monthly_contribution: 0,
           notes: '',
@@ -129,9 +139,9 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
               name: '',
               asset_class: 'Stocks',
               current_value: 0,
-              annual_roi_pct: 7,
-              tax_type: 'pct_appreciation',
-              tax_value: 15,
+              annual_roi_pct: defaultRoi['Stocks'],
+              tax_type: defaultTax['Stocks'].tax_type,
+              tax_value: defaultTax['Stocks'].tax_value,
               cost_basis: 0,
               monthly_contribution: 0,
               notes: '',
@@ -144,10 +154,13 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
   const taxType = form.watch('tax_type')
   const assetClass = form.watch('asset_class')
 
-  // Auto-fill default ROI when asset class changes (new assets only)
+  // Auto-fill default ROI and tax when asset class changes (new assets only)
   useEffect(() => {
     if (!editAsset && assetClass) {
-      form.setValue('annual_roi_pct', defaultRoi[assetClass as AssetClass] ?? 0)
+      const cls = assetClass as AssetClass
+      form.setValue('annual_roi_pct', defaultRoi[cls] ?? 0)
+      form.setValue('tax_type', defaultTax[cls]?.tax_type ?? 'pct_appreciation')
+      form.setValue('tax_value', defaultTax[cls]?.tax_value ?? 0)
     }
   }, [assetClass]) // eslint-disable-line react-hooks/exhaustive-deps
 
