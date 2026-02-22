@@ -318,20 +318,19 @@ export function projectNetWorthDetailed(
       }
     }
 
-    // Step 2: determine net savings available this month.
+    // Step 2: determine net cash flow this month.
     //
-    // When monthly_income > 0:
-    //   netSavings = income×salaryGrowth − spend×inflation  (floored at 0)
+    // When monthly_income > 0, four regimes:
+    //   a) netFlow > totalBaseContrib → invest full amounts + distribute excess by surplusWeights
+    //   b) 0 < netFlow ≤ totalBaseContrib → scale contributions down proportionally
+    //   c) netFlow = 0                → no contributions
+    //   d) netFlow < 0                → DRAWDOWN: portfolio covers the shortfall each month,
+    //                                   distributed by current asset value weights.
+    //                                   This is the correct behaviour when spend > income —
+    //                                   the portfolio shrinks and FIRE may never be reached.
     //
-    //   Three regimes:
-    //   a) netSavings <= 0               → invest nothing
-    //   b) netSavings < totalBaseContrib → scale every contribution proportionally
-    //                                      so their sum equals netSavings exactly
-    //   c) netSavings >= totalBaseContrib → invest full per-asset amounts;
-    //                                      any excess (salary raise) distributed by surplusWeights
-    //
-    // When monthly_income is not set → legacy: use per-asset amounts as-is.
-    let netSavings = -1  // sentinel: income not configured
+    // When monthly_income is not set → legacy: per-asset contributions as-is.
+    let netFlow: number | null = null   // null = income not configured
     if (!isRetired && settings.monthly_income > 0) {
       const rawGrowthFactor = Math.pow(1 + annualSalaryGrowth, yearNum)
       const salaryGrowthFactor = annualSalaryCap > 0 && currentAnnualSalary > 0
@@ -339,36 +338,50 @@ export function projectNetWorthDetailed(
         : rawGrowthFactor
       const growthIncome = settings.monthly_income * salaryGrowthFactor
       const growthSpend  = settings.monthly_spend  * inflationFactor
-      netSavings = Math.max(0, growthIncome - growthSpend)
+      netFlow = growthIncome - growthSpend   // can be negative
     }
 
-    // Step 3: add contributions to each asset
+    // Pre-compute value weights for drawdown distribution (only needed when netFlow < 0)
+    let totalPortfolioValue = 0
+    if (netFlow !== null && netFlow < 0) {
+      totalPortfolioValue = assetValues.reduce((s, v) => s + Math.max(0, v), 0)
+    }
+
+    // Step 3: apply cash flow to each asset
     for (let i = 0; i < assets.length; i++) {
       let contrib: number
       if (isRetired) {
         contrib = postRetirementMonthly > 0
           ? postRetirementMonthly * inflationFactor * surplusWeights[i]
           : 0
-      } else if (netSavings >= 0) {
-        // Income-aware path
-        if (netSavings <= 0) {
-          contrib = 0
-        } else if (totalBaseContrib > 0 && netSavings < totalBaseContrib) {
-          // Scale contributions down proportionally — zero sum with available savings
-          contrib = assetBaseContrib[i] * (netSavings / totalBaseContrib)
-        } else {
-          // Full contributions; distribute any excess (salary raise above base) by surplusWeights
-          const excess = netSavings - totalBaseContrib
-          contrib = assetBaseContrib[i] + excess * surplusWeights[i]
-        }
-      } else {
+      } else if (netFlow === null) {
         // Legacy fallback: income not configured, use per-asset contributions as-is
         contrib = assetBaseContrib[i]
+      } else if (netFlow < 0) {
+        // Drawdown: spread the shortfall across assets by current value weight
+        contrib = totalPortfolioValue > 0
+          ? netFlow * (Math.max(0, assetValues[i]) / totalPortfolioValue)
+          : 0
+      } else if (netFlow === 0) {
+        contrib = 0
+      } else if (totalBaseContrib > 0 && netFlow < totalBaseContrib) {
+        // Partial savings: scale contributions down proportionally
+        contrib = assetBaseContrib[i] * (netFlow / totalBaseContrib)
+      } else {
+        // Full contributions + distribute any salary-raise excess by surplusWeights
+        const excess = netFlow - totalBaseContrib
+        contrib = assetBaseContrib[i] + excess * surplusWeights[i]
       }
-      assetValues[i] += contrib
-      // New contributions are new cost basis for pct_appreciation assets
+      assetValues[i] = Math.max(0, assetValues[i] + contrib)
+      // Track cost basis for pct_appreciation assets
       if (assets[i].tax_type === 'pct_appreciation') {
-        assetCostBasis[i] += contrib
+        if (contrib > 0) {
+          assetCostBasis[i] += contrib  // new money in = new basis
+        } else if (contrib < 0 && assetValues[i] > 0) {
+          // Drawdown: reduce basis proportionally to the withdrawal
+          const withdrawalRatio = Math.abs(contrib) / (assetValues[i] - contrib)
+          assetCostBasis[i] = Math.max(0, assetCostBasis[i] * (1 - withdrawalRatio))
+        }
       }
       assetBreakdown[i].values.push(Math.round(displayValue(i)))
     }
