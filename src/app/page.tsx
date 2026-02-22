@@ -16,7 +16,7 @@ export default function Home() {
 
       <main className="flex-1 overflow-auto">
         <div className="max-w-7xl mx-auto">
-          {activeTab === 'dashboard' && <DashboardView />}
+          {activeTab === 'dashboard' && <DashboardView onNavigate={setActiveTab} />}
           {activeTab === 'assets' && <AssetsView />}
           {activeTab === 'debts' && <DebtsView />}
           {activeTab === 'settings' && <SettingsView />}

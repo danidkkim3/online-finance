@@ -20,7 +20,7 @@ import { ProjectionTable } from './ProjectionTable'
 import { ShieldCheck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-export function DashboardView() {
+export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'settings') => void }) {
   const { assets, debts, settings } = useStore()
   const sym = settings.currency_symbol
   const currentAge = settings.current_age ?? 30
@@ -76,9 +76,12 @@ export function DashboardView() {
         <span>
           모든 데이터는 이 기기의 브라우저에만 저장되며 어떠한 서버에도 전송되지 않습니다.
           데이터를 보존하려면{' '}
-          <a href="/settings" className="font-medium text-foreground underline underline-offset-2 hover:text-primary transition-colors">
+          <button
+            onClick={() => onNavigate?.('settings')}
+            className="font-medium text-foreground underline underline-offset-2 hover:text-primary transition-colors"
+          >
             설정
-          </a>
+          </button>
           에서 JSON으로 내보내기 하세요.
         </span>
       </div>
