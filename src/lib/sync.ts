@@ -21,7 +21,12 @@ export async function saveUserData(supabase: SupabaseClient, payload: UserData):
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
-  await supabase
+  const { error } = await supabase
     .from('user_data')
-    .upsert({ user_id: user.id, data: payload, updated_at: new Date().toISOString() })
+    .upsert(
+      { user_id: user.id, data: payload, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' },
+    )
+
+  if (error) throw new Error(error.message)
 }
