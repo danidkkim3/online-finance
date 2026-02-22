@@ -56,8 +56,8 @@ const defaultRoi: Record<AssetClass, number> = {
 const defaultTax: Record<AssetClass, { tax_type: TaxType; tax_value: number }> = {
   Cash:           { tax_type: 'pct_appreciation', tax_value: 0 },    // 비과세
   '예금':         { tax_type: 'pct_appreciation',  tax_value: 15.4 }, // 이자소득세 15.4%
-  Stocks:         { tax_type: 'pct_appreciation',  tax_value: 0 },    // 소액주주 비과세 (해외주식 22%로 변경)
-  'Real Estate':  { tax_type: 'pct_appreciation',  tax_value: 22 },   // 양도소득세 22%
+  Stocks:         { tax_type: 'pct_appreciation',  tax_value: 15.4 }, // 배당소득세 15.4%
+  'Real Estate':  { tax_type: 'pct_appreciation',  tax_value: 6 },    // 양도소득세 기본세율 6%
   Crypto:         { tax_type: 'pct_appreciation',  tax_value: 0 },    // 2027년까지 과세 유예
   Bonds:          { tax_type: 'pct_appreciation',  tax_value: 15.4 }, // 이자소득세 15.4%
   Other:          { tax_type: 'pct_appreciation',  tax_value: 0 },
