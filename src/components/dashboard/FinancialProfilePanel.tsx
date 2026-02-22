@@ -168,8 +168,8 @@ export function FinancialProfilePanel({ fireMonthIndex = -1 }: { fireMonthIndex?
           />
 
           <SliderRow
-            label="연간 지출"
-            tooltip="순 저축액 계산에 사용됩니다. 예측 모델에서 물가 상승률만큼 매년 증가하며, 그만큼 투자 가능 금액이 줄어듭니다."
+            label="대출 상환금 제외한 월 생활비"
+            tooltip="대출 상환금은 부채 탭에서 별도 입력. 순 저축액 계산에 사용되며 물가 상승률만큼 매년 증가합니다."
             value={annualSpend}
             displayValue={isKrw ? formatKrwAnnual(annualSpend) : formatCurrency(annualSpend, sym)}
             min={0}
