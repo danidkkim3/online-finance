@@ -43,6 +43,16 @@ const assetClassLabels: Record<AssetClass, string> = {
   Other: '기타',
 }
 
+const defaultRoi: Record<AssetClass, number> = {
+  Cash: 0,
+  '예금': 3,
+  Stocks: 7,
+  'Real Estate': 7,
+  Crypto: 7,
+  Bonds: 3,
+  Other: 0,
+}
+
 const taxTypes: { value: TaxType; label: string }[] = [
   { value: 'pct_appreciation', label: '차익 대비 % (양도소득세)' },
   { value: 'pct_total', label: '총 가치 대비 %' },
@@ -132,6 +142,14 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
   }, [open, editAsset]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const taxType = form.watch('tax_type')
+  const assetClass = form.watch('asset_class')
+
+  // Auto-fill default ROI when asset class changes (new assets only)
+  useEffect(() => {
+    if (!editAsset && assetClass) {
+      form.setValue('annual_roi_pct', defaultRoi[assetClass as AssetClass] ?? 0)
+    }
+  }, [assetClass]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function onSubmit(values: FormValues) {
     if (editAsset) {
@@ -180,7 +198,7 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>자산 유형</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="bg-input">
                           <SelectValue />
