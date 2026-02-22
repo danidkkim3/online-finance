@@ -240,8 +240,9 @@ export function ProjectionChart({
           <AreaChart
             data={displayData}
             margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-            onMouseMove={(state) => {
-              if (state.isTooltipActive && state.chartX != null && state.chartY != null) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onMouseMove={(state: any) => {
+              if (state?.chartX !== undefined && state?.chartY !== undefined) {
                 setMousePos({ x: state.chartX, y: state.chartY })
               }
             }}
