@@ -117,6 +117,16 @@ export function AssetCard({ asset, onEdit }: AssetCardProps) {
           )}
         </div>
 
+        {/* 재산세 — Real Estate only */}
+        {asset.asset_class === 'Real Estate' && asset.property_tax_pct != null && asset.property_tax_pct > 0 && (
+          <div className="mt-3 flex items-center justify-between rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm">
+            <span className="text-amber-700/70 text-xs">재산세 ({asset.property_tax_pct}%/년)</span>
+            <span className="font-medium text-amber-900">
+              {formatCurrency(Math.round(asset.current_value * asset.property_tax_pct / 100), sym)}/년
+            </span>
+          </div>
+        )}
+
         {/* Linked mortgage equity panel */}
         {linkedMortgage && equity !== null && (
           <div className="mt-3 rounded-lg bg-blue-50 border border-blue-200 p-3 space-y-2">

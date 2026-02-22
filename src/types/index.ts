@@ -30,6 +30,7 @@ export interface Asset {
   cost_basis: number
   monthly_contribution: number
   notes: string
+  property_tax_pct?: number  // 재산세 — annual % of property value (Real Estate only)
 }
 
 export interface Debt {

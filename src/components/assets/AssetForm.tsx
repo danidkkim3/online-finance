@@ -79,7 +79,15 @@ const schema = z.object({
   cost_basis: z.coerce.number().min(0),
   monthly_contribution: z.coerce.number().min(0),
   notes: z.string(),
+  property_tax_pct: z.coerce.number().min(0).optional(),
 })
+
+function defaultPropertyTaxRate(value: number): number {
+  if (value <= 60_000_000) return 0.1
+  if (value <= 150_000_000) return 0.15
+  if (value <= 300_000_000) return 0.25
+  return 0.4
+}
 
 export type FormValues = z.infer<typeof schema>
 
@@ -106,6 +114,7 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
           cost_basis: editAsset.cost_basis,
           monthly_contribution: editAsset.monthly_contribution,
           notes: editAsset.notes,
+          property_tax_pct: editAsset.property_tax_pct ?? defaultPropertyTaxRate(editAsset.current_value),
         }
       : {
           name: '',
@@ -117,6 +126,7 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
           cost_basis: 0,
           monthly_contribution: 0,
           notes: '',
+          property_tax_pct: 0.1,
         },
   })
 
@@ -134,6 +144,7 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
               cost_basis: editAsset.cost_basis,
               monthly_contribution: editAsset.monthly_contribution,
               notes: editAsset.notes,
+              property_tax_pct: editAsset.property_tax_pct ?? defaultPropertyTaxRate(editAsset.current_value),
             }
           : {
               name: '',
@@ -145,6 +156,7 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
               cost_basis: 0,
               monthly_contribution: 0,
               notes: '',
+              property_tax_pct: 0.1,
               ...prefillValues,
             },
       )
@@ -153,6 +165,7 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
 
   const taxType = form.watch('tax_type')
   const assetClass = form.watch('asset_class')
+  const currentValue = form.watch('current_value')
   const isRealEstate = assetClass === 'Real Estate'
 
   // Auto-fill default ROI and tax when asset class changes (new assets only)
@@ -165,11 +178,22 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
     }
   }, [assetClass]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-fill property tax rate when current_value changes (Real Estate only, new assets only)
+  useEffect(() => {
+    if (!editAsset && isRealEstate && currentValue >= 0) {
+      form.setValue('property_tax_pct', defaultPropertyTaxRate(currentValue))
+    }
+  }, [currentValue, isRealEstate]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function onSubmit(values: FormValues) {
+    const payload = {
+      ...values,
+      property_tax_pct: isRealEstate ? (values.property_tax_pct ?? 0) : undefined,
+    }
     if (editAsset) {
-      updateAsset(editAsset.id, values as Partial<Omit<Asset, 'id'>>)
+      updateAsset(editAsset.id, payload as Partial<Omit<Asset, 'id'>>)
     } else {
-      addAsset(values as Omit<Asset, 'id'>)
+      addAsset(payload as Omit<Asset, 'id'>)
     }
     form.reset()
     onClose()
@@ -342,6 +366,26 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
                           className="bg-input"
                         />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* 재산세 — Real Estate only */}
+              {isRealEstate && (
+                <FormField
+                  control={form.control}
+                  name="property_tax_pct"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>재산세율 (%)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.05" min="0" {...field} className="bg-input" />
+                      </FormControl>
+                      <FormDescription className="text-xs text-muted-foreground">
+                        연간 부동산 가치 대비 % · 6천만 이하 0.1% / ~1.5억 0.15% / ~3억 0.25% / 초과 0.4%
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

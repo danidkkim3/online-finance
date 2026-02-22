@@ -37,9 +37,13 @@ export function assetAfterTaxRoi(asset: Asset): number {
       }
       return asset.annual_roi_pct / 100
     case 'pct_appreciation':
-    default:
+    default: {
       // Tax deferred; gross ROI shown for weighting purposes
-      return asset.annual_roi_pct / 100
+      const baseRoi = asset.annual_roi_pct / 100
+      // Subtract annual property tax drag for real estate
+      const propTax = asset.property_tax_pct ?? 0
+      return baseRoi - propTax / 100
+    }
   }
 }
 
@@ -297,9 +301,13 @@ export function projectNetWorthDetailed(
     const inflationFactor = Math.pow(1 + annualInflation, yearNum)
     const isRetired = m >= retirementMonth
 
-    // Step 1: grow each asset by its own ROI
+    // Step 1: grow each asset by its own ROI, then deduct annual property tax monthly
     for (let i = 0; i < assets.length; i++) {
       assetValues[i] *= (1 + assetMonthlyROI[i])
+      const propertyTaxPct = assets[i].property_tax_pct
+      if (propertyTaxPct && propertyTaxPct > 0) {
+        assetValues[i] -= assetValues[i] * (propertyTaxPct / 100) / 12
+      }
     }
 
     // Step 2: calculate surplus (salary raises above base, net of inflation spend growth)
