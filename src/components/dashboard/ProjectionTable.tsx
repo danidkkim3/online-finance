@@ -9,6 +9,8 @@ interface ProjectionTableProps {
   fireNumber: number
   currentAge: number
   currencySymbol: string
+  monthlyIncome: number
+  salaryGrowthRate: number  // annual %, e.g. 3
 }
 
 export function ProjectionTable({
@@ -16,23 +18,28 @@ export function ProjectionTable({
   fireNumber,
   currentAge,
   currencySymbol,
+  monthlyIncome,
+  salaryGrowthRate,
 }: ProjectionTableProps) {
   const currentYear = new Date().getFullYear()
 
   const rows = useMemo(() => {
-    const years: { year: number; age: number; netWorth: number; fireReached: boolean }[] = []
+    const years: { year: number; age: number; netWorth: number; annualSalary: number; fireReached: boolean }[] = []
+    const growthFactor = 1 + salaryGrowthRate / 100
     for (let y = 0; y < 30; y++) {
       const monthIndex = y * 12 + 11  // end of each year
       const netWorth = projection[monthIndex] ?? 0
+      const annualSalary = monthlyIncome * 12 * Math.pow(growthFactor, y + 1)
       years.push({
         year: currentYear + y + 1,
         age: currentAge + y + 1,
         netWorth,
+        annualSalary,
         fireReached: fireNumber > 0 && netWorth >= fireNumber,
       })
     }
     return years
-  }, [projection, fireNumber, currentAge, currentYear])
+  }, [projection, fireNumber, currentAge, currentYear, monthlyIncome, salaryGrowthRate])
 
   // Find first FIRE year
   const fireRowIndex = rows.findIndex((r) => r.fireReached)
@@ -49,6 +56,7 @@ export function ProjectionTable({
               <tr className="border-b border-border text-xs text-muted-foreground">
                 <th className="text-left px-5 py-2.5 font-medium">연도</th>
                 <th className="text-left px-5 py-2.5 font-medium">나이</th>
+                <th className="text-right px-5 py-2.5 font-medium">예상 연봉</th>
                 <th className="text-right px-5 py-2.5 font-medium">예상 순자산</th>
                 <th className="text-right px-5 py-2.5 font-medium">FIRE 달성</th>
               </tr>
@@ -66,6 +74,9 @@ export function ProjectionTable({
                     </td>
                     <td className={`px-5 py-2.5 tabular-nums ${isFireYear ? 'text-green-700' : 'text-muted-foreground'}`}>
                       {row.age}세
+                    </td>
+                    <td className={`px-5 py-2.5 tabular-nums text-right ${isFireYear ? 'text-green-700' : 'text-muted-foreground'}`}>
+                      {monthlyIncome > 0 ? formatCurrency(Math.round(row.annualSalary), currencySymbol) : '—'}
                     </td>
                     <td className={`px-5 py-2.5 tabular-nums text-right font-medium ${isFireYear ? 'text-green-700' : 'text-foreground'}`}>
                       {formatCurrency(row.netWorth, currencySymbol)}
