@@ -139,8 +139,77 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
         </div>
       )}
 
-      {/* KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+      {/* KPI Row — mobile: 2-page swipe (4 then 2), desktop: 6-col grid */}
+
+      {/* Mobile swipeable */}
+      <div className="lg:hidden overflow-x-auto snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4">
+        <div className="flex gap-4">
+          {/* Page 1: first 4 cards */}
+          <div className="snap-start snap-always shrink-0 w-[calc(100vw-2rem)] grid grid-cols-2 gap-3">
+            <KpiCard
+              label="순자산"
+              tooltip="세후 자산 합계에서 부채 잔액 합계를 뺀 값입니다."
+              value={formatCurrency(netWorth, sym)}
+              subValue={adjustedFireTarget > 0 ? `FIRE까지 ${Math.min(100, Math.round((netWorth / adjustedFireTarget) * 100))}%` : undefined}
+              featured
+            />
+            <KpiCard
+              label="FIRE 목표액"
+              tooltip="(월 목표 × 12) ÷ 안전 인출률로 계산한 필요 총 자산."
+              value={formatCurrency(adjustedFireTarget, sym)}
+              subValue={`${formatCurrency(Math.max(0, settings.fire_monthly_goal - postRetirementMonthly), sym)}/월 목표`}
+            />
+            <KpiCard
+              label="FIRE 예상 시점"
+              tooltip="현재 궤적 기준으로 FIRE 목표액에 도달하는 예상 연월입니다."
+              value={fireDateLabel ?? (target > 0 ? '달성 불가' : '-')}
+              subValue={fireDateLabel ? timeToFire ?? undefined : undefined}
+              subValue2={fireAgeLabel ?? undefined}
+              subValueColor={fireDateLabel ? 'green' : target > 0 ? 'red' : undefined}
+            />
+            <KpiCard
+              label="저축률"
+              tooltip="(소득 - 생활비 - 대출이자) ÷ 소득."
+              value={savingsRate === null ? '-' : `${Math.round(savingsRate)}%`}
+              subValue={
+                savingsRate === null ? '소득을 입력하세요' :
+                savingsRate >= 50 ? '🔥 FIRE 속도 빠름' :
+                savingsRate >= 20 ? '양호 · 더 줄여보세요' :
+                '⚠️ 저축률을 높이세요'
+              }
+              subValueColor={
+                savingsRate === null ? undefined :
+                savingsRate >= 50 ? 'green' :
+                savingsRate >= 20 ? 'yellow' :
+                'red'
+              }
+            />
+          </div>
+          {/* Page 2: remaining 2 cards */}
+          <div className="snap-start snap-always shrink-0 w-[calc(100vw-2rem)] grid grid-cols-2 gap-3 content-start">
+            <KpiCard
+              label="포트폴리오 수익률"
+              tooltip="현재 자산 비중 기준 세후 가중 평균 수익률입니다."
+              value={assets.length > 0 ? `${weightedRoi.toFixed(2)}%` : '-'}
+              subValue={assets.length > 0 ? '현재 비중 기준' : '자산을 추가하세요'}
+            />
+            <KpiCard
+              label="패시브 인컴"
+              tooltip="지금 은퇴한다면 순자산 × 안전 인출률 ÷ 12로 계산된 월 인출 가능 금액입니다."
+              value={formatCurrency(passiveIncome, sym)}
+              subValue={`/월 (SWR ${settings.safe_withdrawal_rate}%)`}
+            />
+          </div>
+        </div>
+        {/* Page indicator dots */}
+        <div className="flex justify-center gap-1.5 mt-2.5">
+          <span className="w-4 h-1 rounded-full bg-foreground/30" />
+          <span className="w-1.5 h-1 rounded-full bg-foreground/15" />
+        </div>
+      </div>
+
+      {/* Desktop grid */}
+      <div className="hidden lg:grid lg:grid-cols-3 xl:grid-cols-6 gap-3">
         <KpiCard
           label="순자산"
           tooltip="세후 자산 합계에서 부채 잔액 합계를 뺀 값입니다."
