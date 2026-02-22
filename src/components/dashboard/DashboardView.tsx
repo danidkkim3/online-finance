@@ -140,9 +140,9 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
         />
         <KpiCard
           label="포트폴리오 수익률"
-          tooltip="보유 자산의 세후 연 수익률을 현재 가치 기준으로 가중 평균한 값입니다. 자산 성장 예측에 이 수익률이 사용됩니다."
+          tooltip="현재 자산 비중 기준 세후 가중 평균 수익률입니다. 예측 차트에서는 각 자산이 개별 수익률로 독립 성장하며, 새 투자금은 월 납입 비율에 따라 배분됩니다. 예: 주식에만 납입하면 시간이 지날수록 주식 비중이 높아져 실효 수익률이 변화합니다."
           value={assets.length > 0 ? `${weightedRoi.toFixed(2)}%` : '-'}
-          subValue={assets.length > 0 ? '세후 가중 평균 연 수익률' : '자산을 추가하세요'}
+          subValue={assets.length > 0 ? '현재 비중 기준 · 예측은 납입 비율로 재조정' : '자산을 추가하세요'}
         />
         <KpiCard
           label="패시브 인컴 (현재 기준)"
