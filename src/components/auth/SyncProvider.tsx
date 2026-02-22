@@ -49,12 +49,17 @@ export function SyncProvider() {
       if (saveTimer.current) clearTimeout(saveTimer.current)
       window.dispatchEvent(new Event('fire:saving'))
       saveTimer.current = setTimeout(async () => {
-        await saveUserData(supabase, {
-          assets: state.assets,
-          debts: state.debts,
-          settings: state.settings,
-        })
-        window.dispatchEvent(new Event('fire:synced'))
+        try {
+          await saveUserData(supabase, {
+            assets: state.assets,
+            debts: state.debts,
+            settings: state.settings,
+          })
+          window.dispatchEvent(new Event('fire:synced'))
+        } catch (err) {
+          console.error('[SyncProvider] save failed:', err)
+          window.dispatchEvent(new Event('fire:syncerror'))
+        }
       }, 1500)
     })
 

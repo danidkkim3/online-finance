@@ -9,7 +9,7 @@ import { Cloud, CloudOff, LogOut, User as UserIcon } from 'lucide-react'
 export function UserMenu() {
   const [user, setUser] = useState<User | null>(null)
   const [open, setOpen] = useState(false)
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const ref = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -44,11 +44,17 @@ export function UserMenu() {
       setSyncStatus('saved')
       clearTimer.current = setTimeout(() => setSyncStatus('idle'), 2500)
     }
+    function onError() {
+      setSyncStatus('error')
+      clearTimer.current = setTimeout(() => setSyncStatus('idle'), 3000)
+    }
     window.addEventListener('fire:saving', onSaving)
     window.addEventListener('fire:synced', onSynced)
+    window.addEventListener('fire:syncerror', onError)
     return () => {
       window.removeEventListener('fire:saving', onSaving)
       window.removeEventListener('fire:synced', onSynced)
+      window.removeEventListener('fire:syncerror', onError)
       if (clearTimer.current) clearTimeout(clearTimer.current)
     }
   }, [])
@@ -86,22 +92,13 @@ export function UserMenu() {
 
       {/* Save toast — bottom right */}
       {syncStatus !== 'idle' && (
-        <div className={`fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-lg border text-sm font-medium transition-all ${
-          syncStatus === 'saving'
-            ? 'bg-white border-border text-muted-foreground'
-            : 'bg-white border-green-200 text-green-700'
+        <div className={`fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-lg border text-sm font-medium ${
+          syncStatus === 'saving' ? 'bg-white border-border text-muted-foreground' :
+          syncStatus === 'error'  ? 'bg-white border-red-200 text-red-600' :
+                                    'bg-white border-green-200 text-green-700'
         }`}>
-          {syncStatus === 'saving' ? (
-            <>
-              <Cloud className="w-4 h-4 animate-pulse" />
-              저장 중...
-            </>
-          ) : (
-            <>
-              <Cloud className="w-4 h-4" />
-              ✓ 저장됨
-            </>
-          )}
+          <Cloud className={`w-4 h-4 ${syncStatus === 'saving' ? 'animate-pulse' : ''}`} />
+          {syncStatus === 'saving' ? '저장 중...' : syncStatus === 'error' ? '저장 실패' : '✓ 저장됨'}
         </div>
       )}
 
