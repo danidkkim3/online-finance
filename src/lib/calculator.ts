@@ -221,26 +221,36 @@ export function projectNetWorth(
   const annualSalaryCap = settings.salary_cap ?? 0
   const currentAnnualSalary = settings.monthly_income * 12
 
-  // For detecting FIRE crossing to activate post-retirement income
+  // Retirement age overrides salary contributions
+  const currentAge = settings.current_age ?? 30
+  const retirementAge = settings.retirement_age ?? 60
+  const retirementMonth = Math.max(0, (retirementAge - currentAge) * 12)
+
+  // For detecting FIRE crossing (used for milestone display only)
   const fireTarget = fireNumber(settings, postRetirementMonthly)
   let fireReached = false
 
   for (let m = 0; m < months; m++) {
     const yearNum = Math.floor(m / 12)
-    const rawGrowthFactor = Math.pow(1 + annualSalaryGrowth, yearNum)
-    // Cap the growth factor so projected salary never exceeds salary_cap
-    const salaryGrowthFactor = annualSalaryCap > 0 && currentAnnualSalary > 0
-      ? Math.min(rawGrowthFactor, annualSalaryCap / currentAnnualSalary)
-      : rawGrowthFactor
     const inflationFactor = Math.pow(1 + annualInflation, yearNum)
-    // Contributions scale up with salary growth, but inflating spend erodes the surplus
-    const spendDrag = settings.monthly_spend * (inflationFactor - 1)
-    const adjustedContribution = Math.max(0, monthlyContribution * salaryGrowthFactor - spendDrag)
-    // After FIRE, add post-retirement earned income (inflation-adjusted) as bonus contribution
-    const bonusContribution = fireReached && postRetirementMonthly > 0
-      ? postRetirementMonthly * inflationFactor
-      : 0
-    portfolioValue = portfolioValue * (1 + weightedMonthlyReturn) + adjustedContribution + bonusContribution
+    const isRetired = m >= retirementMonth
+
+    let contribution: number
+    if (isRetired) {
+      // After retirement: salary contributions stop, post-retirement income replaces them
+      contribution = postRetirementMonthly > 0 ? postRetirementMonthly * inflationFactor : 0
+    } else {
+      const rawGrowthFactor = Math.pow(1 + annualSalaryGrowth, yearNum)
+      // Cap the growth factor so projected salary never exceeds salary_cap
+      const salaryGrowthFactor = annualSalaryCap > 0 && currentAnnualSalary > 0
+        ? Math.min(rawGrowthFactor, annualSalaryCap / currentAnnualSalary)
+        : rawGrowthFactor
+      // Contributions scale up with salary growth, but inflating spend erodes the surplus
+      const spendDrag = settings.monthly_spend * (inflationFactor - 1)
+      contribution = Math.max(0, monthlyContribution * salaryGrowthFactor - spendDrag)
+    }
+
+    portfolioValue = portfolioValue * (1 + weightedMonthlyReturn) + contribution
 
     let totalDebtBalance = 0
     for (const state of debtStates) {
