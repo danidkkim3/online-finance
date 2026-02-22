@@ -32,6 +32,9 @@ const defaultSettings: Settings = {
   salary_growth_rate: 3.0,
   salary_cap: 0,
   inflation_rate: 2.0,
+  post_retirement_work: 'none',
+  min_wage_monthly: 2_060_740,
+  retirement_age: 60,
 }
 
 export const useStore = create<FireStore>()(

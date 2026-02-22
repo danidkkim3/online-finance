@@ -59,4 +59,7 @@ export interface Settings {
   salary_growth_rate: number  // annual % increase applied to contributions in projection
   salary_cap: number          // maximum annual salary (0 = no cap)
   inflation_rate: number      // annual % used to inflate the FIRE target over time
+  post_retirement_work: 'none' | 'half' | 'full'
+  min_wage_monthly: number
+  retirement_age: number
 }

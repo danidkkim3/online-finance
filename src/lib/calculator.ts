@@ -156,9 +156,10 @@ export function mortgageMonthlyPayment(
 }
 
 /** FIRE number: the portfolio size needed to retire */
-export function fireNumber(settings: Settings): number {
+export function fireNumber(settings: Settings, postRetirementMonthly = 0): number {
   if (settings.safe_withdrawal_rate <= 0) return 0
-  return (settings.fire_monthly_goal * 12) / (settings.safe_withdrawal_rate / 100)
+  const adjustedGoal = Math.max(0, settings.fire_monthly_goal - postRetirementMonthly)
+  return (adjustedGoal * 12) / (settings.safe_withdrawal_rate / 100)
 }
 
 /** Total net worth = sum(after-tax asset values) - sum(debt balances) */
@@ -195,6 +196,7 @@ export function projectNetWorth(
   debts: Debt[],
   settings: Settings,
   months = 360,
+  postRetirementMonthly = 0,
 ): number[] {
   const curve: number[] = []
 
@@ -219,6 +221,10 @@ export function projectNetWorth(
   const annualSalaryCap = settings.salary_cap ?? 0
   const currentAnnualSalary = settings.monthly_income * 12
 
+  // For detecting FIRE crossing to activate post-retirement income
+  const fireTarget = fireNumber(settings, postRetirementMonthly)
+  let fireReached = false
+
   for (let m = 0; m < months; m++) {
     const yearNum = Math.floor(m / 12)
     const rawGrowthFactor = Math.pow(1 + annualSalaryGrowth, yearNum)
@@ -230,7 +236,11 @@ export function projectNetWorth(
     // Contributions scale up with salary growth, but inflating spend erodes the surplus
     const spendDrag = settings.monthly_spend * (inflationFactor - 1)
     const adjustedContribution = Math.max(0, monthlyContribution * salaryGrowthFactor - spendDrag)
-    portfolioValue = portfolioValue * (1 + weightedMonthlyReturn) + adjustedContribution
+    // After FIRE, add post-retirement earned income (inflation-adjusted) as bonus contribution
+    const bonusContribution = fireReached && postRetirementMonthly > 0
+      ? postRetirementMonthly * inflationFactor
+      : 0
+    portfolioValue = portfolioValue * (1 + weightedMonthlyReturn) + adjustedContribution + bonusContribution
 
     let totalDebtBalance = 0
     for (const state of debtStates) {
@@ -271,7 +281,12 @@ export function projectNetWorth(
       totalDebtBalance += state.balance
     }
 
-    curve.push(portfolioValue - totalDebtBalance)
+    const netValue = portfolioValue - totalDebtBalance
+    curve.push(netValue)
+
+    if (!fireReached && fireTarget > 0 && netValue >= fireTarget * Math.pow(1 + annualInflation, m / 12)) {
+      fireReached = true
+    }
   }
 
   return curve

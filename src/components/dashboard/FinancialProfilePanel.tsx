@@ -313,6 +313,62 @@ export function FinancialProfilePanel() {
             />
           )}
 
+          {/* Post-retirement work toggle */}
+          <div className="space-y-2 pt-1 border-t border-border/60">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                은퇴 후 근로 소득
+                <InfoTooltip text="은퇴 후 파트타임 근로 소득을 설정하면 필요한 FIRE 목표액이 줄어듭니다. 소득은 물가 상승률에 따라 자동 조정됩니다." />
+              </div>
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-muted-foreground">은퇴 나이</span>
+                <input
+                  type="number"
+                  min={settings.current_age ?? 30}
+                  max={100}
+                  value={settings.retirement_age ?? 60}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value)
+                    if (!isNaN(v)) updateSettings({ retirement_age: v })
+                  }}
+                  className="w-14 text-right text-sm font-medium bg-transparent border-b border-gray-300 focus:border-gray-500 focus:outline-none tabular-nums"
+                />
+                <span className="text-muted-foreground">세</span>
+              </div>
+            </div>
+            <div className="flex rounded-md border border-border overflow-hidden text-xs">
+              {(['none', 'half', 'full'] as const).map((opt) => {
+                const labels = { none: '비근로', half: '최저임금 50%', full: '최저임금 100%' }
+                const active = (settings.post_retirement_work ?? 'none') === opt
+                return (
+                  <button
+                    key={opt}
+                    onClick={() => updateSettings({ post_retirement_work: opt })}
+                    className={`flex-1 px-2 py-1.5 transition-colors ${active ? 'bg-primary text-primary-foreground font-medium' : 'text-muted-foreground hover:bg-gray-100'}`}
+                  >
+                    {labels[opt]}
+                  </button>
+                )
+              })}
+            </div>
+
+            {(settings.post_retirement_work ?? 'none') !== 'none' && (
+              <SliderRow
+                label="최저임금 (월)"
+                tooltip="은퇴 후 파트타임 근로 시 기준이 되는 월 최저임금입니다. 실제 수령액은 선택한 비율에 따라 결정됩니다."
+                value={settings.min_wage_monthly ?? 2_060_740}
+                displayValue={isKrw ? formatKrwAnnual(settings.min_wage_monthly ?? 2_060_740) : formatCurrency(settings.min_wage_monthly ?? 2_060_740, sym)}
+                min={isKrw ? 500_000 : 500}
+                max={isKrw ? 10_000_000 : 20_000}
+                step={isKrw ? 10_000 : 100}
+                onChange={(v) => updateSettings({ min_wage_monthly: v })}
+                inputUnit={isKrw ? 10_000 : 1_000}
+                inputSuffix={isKrw ? '만원' : 'k'}
+                inputStep={isKrw ? 1 : 1}
+              />
+            )}
+          </div>
+
           {/* Derived summary */}
           <div className="space-y-1.5 text-sm">
             <div className="flex justify-between">
@@ -325,6 +381,20 @@ export function FinancialProfilePanel() {
                   : formatKrwAnnual(fireTarget)}
               </span>
             </div>
+            {(settings.post_retirement_work ?? 'none') !== 'none' && (() => {
+              const minWage = settings.min_wage_monthly ?? 2_060_740
+              const earned = settings.post_retirement_work === 'full' ? minWage : minWage / 2
+              const adjustedGoal = Math.max(0, settings.fire_monthly_goal - earned)
+              const adjustedTarget = settings.safe_withdrawal_rate > 0
+                ? Math.round(adjustedGoal * 12 / (settings.safe_withdrawal_rate / 100))
+                : 0
+              return (
+                <div className="flex justify-between text-xs">
+                  <span className="text-green-700">→ 근로 소득 반영 후 필요 자산</span>
+                  <span className="font-medium text-green-700">{isKrw ? formatKrwAnnual(adjustedTarget) : formatCurrency(adjustedTarget, sym)}</span>
+                </div>
+              )
+            })()}
             <div className="flex justify-between">
               <span className="text-muted-foreground">월 저축액</span>
               <span className={`font-medium ${settings.monthly_income > settings.monthly_spend ? 'text-green-600' : 'text-red-500'}`}>
