@@ -9,7 +9,7 @@ import { LogOut, User as UserIcon } from 'lucide-react'
 export function UserMenu() {
   const [user, setUser] = useState<User | null>(null)
   const [open, setOpen] = useState(false)
-  const [synced, setSynced] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const ref = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -35,9 +35,22 @@ export function UserMenu() {
 
   // Listen for sync events from SyncProvider
   useEffect(() => {
-    function onSynced() { setSynced(true); setTimeout(() => setSynced(false), 2000) }
+    const clearTimer = { current: null as ReturnType<typeof setTimeout> | null }
+    function onSaving() {
+      if (clearTimer.current) clearTimeout(clearTimer.current)
+      setSyncStatus('saving')
+    }
+    function onSynced() {
+      setSyncStatus('saved')
+      clearTimer.current = setTimeout(() => setSyncStatus('idle'), 2500)
+    }
+    window.addEventListener('fire:saving', onSaving)
     window.addEventListener('fire:synced', onSynced)
-    return () => window.removeEventListener('fire:synced', onSynced)
+    return () => {
+      window.removeEventListener('fire:saving', onSaving)
+      window.removeEventListener('fire:synced', onSynced)
+      if (clearTimer.current) clearTimeout(clearTimer.current)
+    }
   }, [])
 
   async function handleSignOut() {
@@ -69,8 +82,11 @@ export function UserMenu() {
         <div className="w-7 h-7 rounded-full bg-[#1c1c1e] text-white text-xs font-semibold flex items-center justify-center">
           {initial}
         </div>
-        {synced && (
-          <span className="hidden sm:inline text-xs text-green-600 font-medium">저장됨</span>
+        {syncStatus === 'saving' && (
+          <span className="hidden sm:inline text-xs text-muted-foreground font-medium">저장 중...</span>
+        )}
+        {syncStatus === 'saved' && (
+          <span className="hidden sm:inline text-xs text-green-600 font-medium">✓ 저장됨</span>
         )}
       </button>
 

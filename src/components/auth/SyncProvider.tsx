@@ -47,6 +47,7 @@ export function SyncProvider() {
     const unsub = useStore.subscribe((state) => {
       if (!loggedIn.current) return
       if (saveTimer.current) clearTimeout(saveTimer.current)
+      window.dispatchEvent(new Event('fire:saving'))
       saveTimer.current = setTimeout(async () => {
         await saveUserData(supabase, {
           assets: state.assets,
