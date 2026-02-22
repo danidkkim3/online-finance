@@ -187,6 +187,7 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
           currencySymbol={sym}
           monthlyIncome={settings.monthly_income}
           salaryGrowthRate={settings.salary_growth_rate ?? 0}
+          salaryCap={settings.salary_cap ?? 0}
         />
       )}
 

@@ -215,6 +215,20 @@ export function FinancialProfilePanel() {
         />
 
         <SliderRow
+          label="연봉 상한선"
+          tooltip="연봉이 이 금액에 도달하면 더 이상 증가하지 않는다고 가정합니다. 0으로 설정하면 상한 없음."
+          value={settings.salary_cap ?? 0}
+          displayValue={isKrw ? formatKrwAnnual(settings.salary_cap ?? 0) : formatCurrency(settings.salary_cap ?? 0, sym)}
+          min={0}
+          max={isKrw ? 500_000_000 : 1_000_000}
+          step={isKrw ? 5_000_000 : 10_000}
+          onChange={(v) => updateSettings({ salary_cap: v })}
+          inputUnit={isKrw ? 10_000 : 1_000}
+          inputSuffix={isKrw ? '만원' : 'k'}
+          inputStep={isKrw ? 100 : 10}
+        />
+
+        <SliderRow
           label="물가 상승률"
           tooltip="지출이 매년 이 비율만큼 증가한다고 가정합니다. 또한 FIRE 목표액도 이 비율로 조정되어 은퇴 시점의 실질 필요 자산을 계산합니다."
           value={settings.inflation_rate ?? 2}

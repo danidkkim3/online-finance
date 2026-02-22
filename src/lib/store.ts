@@ -30,6 +30,7 @@ const defaultSettings: Settings = {
   monthly_spend: 0,
   current_age: 30,
   salary_growth_rate: 3.0,
+  salary_cap: 0,
   inflation_rate: 2.0,
 }
 

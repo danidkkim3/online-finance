@@ -216,10 +216,16 @@ export function projectNetWorth(
 
   const annualSalaryGrowth = (settings.salary_growth_rate ?? 0) / 100
   const annualInflation = (settings.inflation_rate ?? 0) / 100
+  const annualSalaryCap = settings.salary_cap ?? 0
+  const currentAnnualSalary = settings.monthly_income * 12
 
   for (let m = 0; m < months; m++) {
     const yearNum = Math.floor(m / 12)
-    const salaryGrowthFactor = Math.pow(1 + annualSalaryGrowth, yearNum)
+    const rawGrowthFactor = Math.pow(1 + annualSalaryGrowth, yearNum)
+    // Cap the growth factor so projected salary never exceeds salary_cap
+    const salaryGrowthFactor = annualSalaryCap > 0 && currentAnnualSalary > 0
+      ? Math.min(rawGrowthFactor, annualSalaryCap / currentAnnualSalary)
+      : rawGrowthFactor
     const inflationFactor = Math.pow(1 + annualInflation, yearNum)
     // Contributions scale up with salary growth, but inflating spend erodes the surplus
     const spendDrag = settings.monthly_spend * (inflationFactor - 1)

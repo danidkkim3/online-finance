@@ -11,6 +11,7 @@ interface ProjectionTableProps {
   currencySymbol: string
   monthlyIncome: number
   salaryGrowthRate: number  // annual %, e.g. 3
+  salaryCap: number         // 0 = no cap
 }
 
 export function ProjectionTable({
@@ -20,16 +21,19 @@ export function ProjectionTable({
   currencySymbol,
   monthlyIncome,
   salaryGrowthRate,
+  salaryCap,
 }: ProjectionTableProps) {
   const currentYear = new Date().getFullYear()
 
   const rows = useMemo(() => {
     const years: { year: number; age: number; netWorth: number; annualSalary: number; fireReached: boolean }[] = []
     const growthFactor = 1 + salaryGrowthRate / 100
+    const currentAnnualSalary = monthlyIncome * 12
     for (let y = 0; y < 30; y++) {
       const monthIndex = y * 12 + 11  // end of each year
       const netWorth = projection[monthIndex] ?? 0
-      const annualSalary = monthlyIncome * 12 * Math.pow(growthFactor, y + 1)
+      const rawSalary = currentAnnualSalary * Math.pow(growthFactor, y + 1)
+      const annualSalary = salaryCap > 0 ? Math.min(rawSalary, salaryCap) : rawSalary
       years.push({
         year: currentYear + y + 1,
         age: currentAge + y + 1,
@@ -39,7 +43,7 @@ export function ProjectionTable({
       })
     }
     return years
-  }, [projection, fireNumber, currentAge, currentYear, monthlyIncome, salaryGrowthRate])
+  }, [projection, fireNumber, currentAge, currentYear, monthlyIncome, salaryGrowthRate, salaryCap])
 
   // Find first FIRE year
   const fireRowIndex = rows.findIndex((r) => r.fireReached)

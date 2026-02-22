@@ -57,5 +57,6 @@ export interface Settings {
   monthly_spend: number
   current_age: number
   salary_growth_rate: number  // annual % increase applied to contributions in projection
+  salary_cap: number          // maximum annual salary (0 = no cap)
   inflation_rate: number      // annual % used to inflate the FIRE target over time
 }
