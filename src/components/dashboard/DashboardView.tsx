@@ -57,8 +57,15 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
 
   const savingsRate = useMemo(() => {
     if (settings.monthly_income <= 0) return null
-    return ((settings.monthly_income - settings.monthly_spend) / settings.monthly_income) * 100
-  }, [settings.monthly_income, settings.monthly_spend])
+    // Split each debt payment into interest (true expense) + principal (net worth building = savings)
+    // Only subtract the interest portion — principal paydown counts as savings
+    const monthlyInterest = debts.reduce((sum, d) => {
+      const interest = d.balance * (d.annual_interest_rate / 100) / 12
+      return sum + Math.min(d.monthly_payment, interest) // cap at payment in case of overpay
+    }, 0)
+    const trueSavings = settings.monthly_income - settings.monthly_spend - monthlyInterest
+    return (trueSavings / settings.monthly_income) * 100
+  }, [settings.monthly_income, settings.monthly_spend, debts])
 
   const weightedRoi = useMemo(() => {
     const totalVal = assets.reduce((sum, a) => sum + assetAfterTaxValue(a), 0)
@@ -157,7 +164,7 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
         />
         <KpiCard
           label="저축률"
-          tooltip="(소득 - 지출) ÷ 소득. FIRE 달성 속도에 가장 큰 영향을 미치는 지표입니다. 50% 이상이면 빠른 FIRE가 가능합니다."
+          tooltip="(소득 - 생활비 - 대출이자) ÷ 소득. 대출 원금 상환은 순자산 증가이므로 저축으로 계산됩니다. 이자만 지출로 처리합니다. 50% 이상이면 빠른 FIRE가 가능합니다."
           value={savingsRate === null ? '-' : `${Math.round(savingsRate)}%`}
           subValue={
             savingsRate === null ? '소득을 입력하세요' :
