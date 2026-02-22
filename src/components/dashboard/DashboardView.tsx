@@ -190,6 +190,7 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
       {assets.length > 0 && (
         <ProjectionTable
           projection={projection}
+          assetBreakdown={assetBreakdown}
           fireNumber={adjustedFireTarget}
           currentAge={currentAge}
           currencySymbol={sym}
