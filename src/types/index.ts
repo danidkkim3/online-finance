@@ -31,6 +31,7 @@ export interface Asset {
   monthly_contribution: number
   notes: string
   property_tax_pct?: number  // 재산세 — annual % of property value (Real Estate only)
+  jongbuse_pct?: number      // 종부세 — comprehensive real estate tax (Real Estate only)
 }
 
 export interface Debt {

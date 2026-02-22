@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { useEffect } from 'react'
+import { InfoTooltip } from '@/components/ui/info-tooltip'
 
 const assetClasses: AssetClass[] = ['Cash', '예금', 'Stocks', 'Real Estate', 'Crypto', 'Bonds', 'Other']
 const assetClassLabels: Record<AssetClass, string> = {
@@ -80,6 +81,7 @@ const schema = z.object({
   monthly_contribution: z.coerce.number().min(0),
   notes: z.string(),
   property_tax_pct: z.coerce.number().min(0).optional(),
+  jongbuse_pct: z.coerce.number().min(0).optional(),
 })
 
 function defaultPropertyTaxRate(value: number): number {
@@ -115,6 +117,7 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
           monthly_contribution: editAsset.monthly_contribution,
           notes: editAsset.notes,
           property_tax_pct: editAsset.property_tax_pct ?? defaultPropertyTaxRate(editAsset.current_value),
+          jongbuse_pct: editAsset.jongbuse_pct ?? 0,
         }
       : {
           name: '',
@@ -127,6 +130,7 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
           monthly_contribution: 0,
           notes: '',
           property_tax_pct: 0.1,
+          jongbuse_pct: 0,
         },
   })
 
@@ -145,6 +149,7 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
               monthly_contribution: editAsset.monthly_contribution,
               notes: editAsset.notes,
               property_tax_pct: editAsset.property_tax_pct ?? defaultPropertyTaxRate(editAsset.current_value),
+              jongbuse_pct: editAsset.jongbuse_pct ?? 0,
             }
           : {
               name: '',
@@ -157,6 +162,7 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
               monthly_contribution: 0,
               notes: '',
               property_tax_pct: 0.1,
+              jongbuse_pct: 0,
               ...prefillValues,
             },
       )
@@ -189,6 +195,7 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
     const payload = {
       ...values,
       property_tax_pct: isRealEstate ? (values.property_tax_pct ?? 0) : undefined,
+      jongbuse_pct: isRealEstate ? (values.jongbuse_pct ?? 0) : undefined,
     }
     if (editAsset) {
       updateAsset(editAsset.id, payload as Partial<Omit<Asset, 'id'>>)
@@ -372,19 +379,42 @@ export function AssetForm({ open, onClose, editAsset, prefillValues }: AssetForm
                 />
               )}
 
-              {/* 재산세 — Real Estate only */}
+              {/* 재산세 & 종부세 — Real Estate only */}
               {isRealEstate && (
                 <FormField
                   control={form.control}
                   name="property_tax_pct"
                   render={({ field }) => (
-                    <FormItem className="col-span-2">
+                    <FormItem>
                       <FormLabel>재산세율 (%)</FormLabel>
                       <FormControl>
                         <Input type="number" step="0.05" min="0" {...field} className="bg-input" />
                       </FormControl>
                       <FormDescription className="text-xs text-muted-foreground">
-                        연간 부동산 가치 대비 % · 6천만 이하 0.1% / ~1.5억 0.15% / ~3억 0.25% / 초과 0.4%
+                        6천만↓ 0.1% · ~1.5억 0.15% · ~3억 0.25% · 초과 0.4%
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              {isRealEstate && (
+                <FormField
+                  control={form.control}
+                  name="jongbuse_pct"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1">
+                        종부세율 (%)
+                        <InfoTooltip text={
+                          '부과 기준 (공시가격 합산)\n\n주택: 9억 원 초과 (1세대 1주택자는 12억 원 초과)\n토지(종합합산): 5억 원 초과\n토지(별도합산): 80억 원 초과\n\n주택 세율 (과세표준 기준)\n3억 이하: 0.5%\n3억~6억: 0.7%\n6억~12억: 1.0%\n12억~25억: 1.3%\n25억~50억: 1.5%\n50억~94억: 2.0%\n94억 초과: 2.7%'
+                        } />
+                      </FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.1" min="0" {...field} className="bg-input" />
+                      </FormControl>
+                      <FormDescription className="text-xs text-muted-foreground">
+                        기본값 0% · 해당 시 직접 입력
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

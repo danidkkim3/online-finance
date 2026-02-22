@@ -40,9 +40,9 @@ export function assetAfterTaxRoi(asset: Asset): number {
     default: {
       // Tax deferred; gross ROI shown for weighting purposes
       const baseRoi = asset.annual_roi_pct / 100
-      // Subtract annual property tax drag for real estate
-      const propTax = asset.property_tax_pct ?? 0
-      return baseRoi - propTax / 100
+      // Subtract annual holding tax drag (재산세 + 종부세) for real estate
+      const holdingTax = (asset.property_tax_pct ?? 0) + (asset.jongbuse_pct ?? 0)
+      return baseRoi - holdingTax / 100
     }
   }
 }
@@ -304,9 +304,9 @@ export function projectNetWorthDetailed(
     // Step 1: grow each asset by its own ROI, then deduct annual property tax monthly
     for (let i = 0; i < assets.length; i++) {
       assetValues[i] *= (1 + assetMonthlyROI[i])
-      const propertyTaxPct = assets[i].property_tax_pct
-      if (propertyTaxPct && propertyTaxPct > 0) {
-        assetValues[i] -= assetValues[i] * (propertyTaxPct / 100) / 12
+      const annualHoldingTaxPct = (assets[i].property_tax_pct ?? 0) + (assets[i].jongbuse_pct ?? 0)
+      if (annualHoldingTaxPct > 0) {
+        assetValues[i] -= assetValues[i] * (annualHoldingTaxPct / 100) / 12
       }
     }
 

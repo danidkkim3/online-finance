@@ -117,14 +117,40 @@ export function AssetCard({ asset, onEdit }: AssetCardProps) {
           )}
         </div>
 
-        {/* 재산세 — Real Estate only */}
-        {asset.asset_class === 'Real Estate' && asset.property_tax_pct != null && asset.property_tax_pct > 0 && (
-          <div className="mt-3 flex items-center justify-between rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm">
-            <span className="text-amber-700/70 text-xs">재산세 ({asset.property_tax_pct}%/년)</span>
-            <span className="font-medium text-amber-900">
-              {formatCurrency(Math.round(asset.current_value * asset.property_tax_pct / 100), sym)}/년
-            </span>
-          </div>
+        {/* 재산세 + 종부세 — Real Estate only */}
+        {asset.asset_class === 'Real Estate' && (
+          (() => {
+            const jaesan = (asset.property_tax_pct ?? 0) > 0
+              ? asset.current_value * (asset.property_tax_pct! / 100)
+              : 0
+            const jongbu = (asset.jongbuse_pct ?? 0) > 0
+              ? asset.current_value * (asset.jongbuse_pct! / 100)
+              : 0
+            const total = jaesan + jongbu
+            if (total === 0) return null
+            return (
+              <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 space-y-1">
+                {jaesan > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-amber-700/70 text-xs">재산세 ({asset.property_tax_pct}%/년)</span>
+                    <span className="font-medium text-amber-900">{formatCurrency(Math.round(jaesan), sym)}/년</span>
+                  </div>
+                )}
+                {jongbu > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-amber-700/70 text-xs">종부세 ({asset.jongbuse_pct}%/년)</span>
+                    <span className="font-medium text-amber-900">{formatCurrency(Math.round(jongbu), sym)}/년</span>
+                  </div>
+                )}
+                {jaesan > 0 && jongbu > 0 && (
+                  <div className="flex items-center justify-between text-sm border-t border-amber-200 pt-1 mt-1">
+                    <span className="text-amber-700/70 text-xs font-medium">보유세 합계</span>
+                    <span className="font-semibold text-amber-900">{formatCurrency(Math.round(total), sym)}/년</span>
+                  </div>
+                )}
+              </div>
+            )
+          })()
         )}
 
         {/* Linked mortgage equity panel */}
