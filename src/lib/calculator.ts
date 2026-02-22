@@ -245,9 +245,11 @@ export function projectNetWorth(
       const salaryGrowthFactor = annualSalaryCap > 0 && currentAnnualSalary > 0
         ? Math.min(rawGrowthFactor, annualSalaryCap / currentAnnualSalary)
         : rawGrowthFactor
-      // Contributions scale up with salary growth, but inflating spend erodes the surplus
-      const spendDrag = settings.monthly_spend * (inflationFactor - 1)
-      contribution = Math.max(0, monthlyContribution * salaryGrowthFactor - spendDrag)
+      // FIRE principle: income grows with salary, spend grows with inflation only (no lifestyle creep)
+      // contribution = base + income_raise_delta - inflation_spend_delta
+      const incomeGrowth = settings.monthly_income * (salaryGrowthFactor - 1)
+      const spendGrowth = settings.monthly_spend * (inflationFactor - 1)
+      contribution = Math.max(0, monthlyContribution + incomeGrowth - spendGrowth)
     }
 
     portfolioValue = portfolioValue * (1 + weightedMonthlyReturn) + contribution
