@@ -10,6 +10,7 @@ interface KpiCardProps {
   value: string
   subValue?: string
   subValue2?: string
+  subValueColor?: 'green' | 'yellow' | 'red'
   featured?: boolean
   className?: string
 }
@@ -20,9 +21,15 @@ export function KpiCard({
   value,
   subValue,
   subValue2,
+  subValueColor,
   featured = false,
   className,
 }: KpiCardProps) {
+  const subValueClass =
+    subValueColor === 'green' ? 'text-green-600' :
+    subValueColor === 'yellow' ? 'text-yellow-600' :
+    subValueColor === 'red' ? 'text-red-500' :
+    'text-muted-foreground'
   if (featured) {
     return (
       <Card className={cn('bg-[#1c1c1e] border-[#1c1c1e] shadow-lg', className)}>
@@ -52,7 +59,7 @@ export function KpiCard({
         </p>
         <p className="text-2xl font-bold text-foreground kpi-value">{value}</p>
         {subValue && (
-          <p className="text-xs text-muted-foreground mt-1">{subValue}</p>
+          <p className={`text-xs mt-1 ${subValueClass}`}>{subValue}</p>
         )}
         {subValue2 && (
           <p className="text-xs text-foreground mt-0.5 font-medium">{subValue2}</p>

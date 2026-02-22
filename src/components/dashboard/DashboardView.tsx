@@ -55,6 +55,11 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
     [assets, debts, settings, postRetirementMonthly],
   )
 
+  const savingsRate = useMemo(() => {
+    if (settings.monthly_income <= 0) return null
+    return ((settings.monthly_income - settings.monthly_spend) / settings.monthly_income) * 100
+  }, [settings.monthly_income, settings.monthly_spend])
+
   const weightedRoi = useMemo(() => {
     const totalVal = assets.reduce((sum, a) => sum + assetAfterTaxValue(a), 0)
     if (totalVal === 0) return 0
@@ -114,7 +119,7 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
       )}
 
       {/* KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <KpiCard
           label="순자산"
           tooltip="세후 자산 합계에서 부채 잔액 합계를 뺀 값입니다."
@@ -149,6 +154,23 @@ export function DashboardView({ onNavigate }: { onNavigate?: (tab: 'assets' | 's
           tooltip="지금 은퇴한다면 순자산 × 안전 인출률 ÷ 12로 계산된 월 인출 가능 금액입니다."
           value={formatCurrency(passiveIncome, sym)}
           subValue={`/월 (안전 인출률 ${settings.safe_withdrawal_rate}% 기준)`}
+        />
+        <KpiCard
+          label="저축률"
+          tooltip="(소득 - 지출) ÷ 소득. FIRE 달성 속도에 가장 큰 영향을 미치는 지표입니다. 50% 이상이면 빠른 FIRE가 가능합니다."
+          value={savingsRate === null ? '-' : `${Math.round(savingsRate)}%`}
+          subValue={
+            savingsRate === null ? '소득을 입력하세요' :
+            savingsRate >= 50 ? '🔥 FIRE 속도 빠름' :
+            savingsRate >= 20 ? '양호 · 더 줄여보세요' :
+            '⚠️ 저축률을 높이세요'
+          }
+          subValueColor={
+            savingsRate === null ? undefined :
+            savingsRate >= 50 ? 'green' :
+            savingsRate >= 20 ? 'yellow' :
+            'red'
+          }
         />
       </div>
 
