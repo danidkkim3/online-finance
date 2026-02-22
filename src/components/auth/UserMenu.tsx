@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
-import { LogOut, User as UserIcon } from 'lucide-react'
+import { Cloud, CloudOff, LogOut, User as UserIcon } from 'lucide-react'
 
 export function UserMenu() {
   const [user, setUser] = useState<User | null>(null)
@@ -82,13 +82,28 @@ export function UserMenu() {
         <div className="w-7 h-7 rounded-full bg-[#1c1c1e] text-white text-xs font-semibold flex items-center justify-center">
           {initial}
         </div>
-        {syncStatus === 'saving' && (
-          <span className="hidden sm:inline text-xs text-muted-foreground font-medium">저장 중...</span>
-        )}
-        {syncStatus === 'saved' && (
-          <span className="hidden sm:inline text-xs text-green-600 font-medium">✓ 저장됨</span>
-        )}
       </button>
+
+      {/* Save toast — bottom right */}
+      {syncStatus !== 'idle' && (
+        <div className={`fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-lg border text-sm font-medium transition-all ${
+          syncStatus === 'saving'
+            ? 'bg-white border-border text-muted-foreground'
+            : 'bg-white border-green-200 text-green-700'
+        }`}>
+          {syncStatus === 'saving' ? (
+            <>
+              <Cloud className="w-4 h-4 animate-pulse" />
+              저장 중...
+            </>
+          ) : (
+            <>
+              <Cloud className="w-4 h-4" />
+              ✓ 저장됨
+            </>
+          )}
+        </div>
+      )}
 
       {open && (
         <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-border rounded-xl shadow-lg z-50 py-1 overflow-hidden">
