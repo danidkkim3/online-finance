@@ -44,9 +44,9 @@ export function UserMenu() {
     }
   }, [])
 
-  function handleSignOut() {
-    supabase.auth.signOut()
-    setTimeout(() => { window.location.href = '/' }, 300)
+  async function handleSignOut() {
+    await supabase.auth.signOut({ scope: 'local' })
+    window.location.href = '/'
   }
 
   return (
@@ -94,7 +94,7 @@ export function UserMenu() {
                 <p className="text-xs text-muted-foreground mt-0.5">로그인됨</p>
               </div>
               <button
-                onMouseDown={(e) => { e.preventDefault(); handleSignOut() }}
+                onMouseDown={(e) => { e.preventDefault(); void handleSignOut() }}
                 className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition"
               >
                 <LogOut className="w-4 h-4" />
