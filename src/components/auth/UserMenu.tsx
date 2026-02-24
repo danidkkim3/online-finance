@@ -72,18 +72,15 @@ export function UserMenu() {
           <span className="hidden sm:inline">로그인</span>
         </button>
       ) : (
-        <div className="relative">
-          {/* Backdrop — closes dropdown on outside click */}
-          {open && (
-            <div
-              className="fixed inset-0 z-[60]"
-              onClick={() => setOpen(false)}
-            />
-          )}
-
+        <div
+          className="relative"
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false)
+          }}
+        >
           <button
             onClick={() => setOpen((v) => !v)}
-            className="relative z-[70] flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition"
+            className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition"
           >
             <div className="w-7 h-7 rounded-full bg-[#1c1c1e] text-white text-xs font-semibold flex items-center justify-center">
               {(user.email ?? '?')[0].toUpperCase()}
@@ -91,13 +88,13 @@ export function UserMenu() {
           </button>
 
           {open && (
-            <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-border rounded-xl shadow-lg z-[70] py-1 overflow-hidden">
+            <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-border rounded-xl shadow-lg z-[200] py-1 overflow-hidden">
               <div className="px-4 py-2.5 border-b border-border">
                 <p className="text-xs font-medium text-foreground truncate">{user.email}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">로그인됨</p>
               </div>
               <button
-                onClick={handleSignOut}
+                onMouseDown={(e) => { e.preventDefault(); handleSignOut() }}
                 className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition"
               >
                 <LogOut className="w-4 h-4" />
