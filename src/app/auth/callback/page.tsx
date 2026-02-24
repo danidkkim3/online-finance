@@ -9,10 +9,14 @@ export default function AuthCallbackPage() {
     const code = new URLSearchParams(window.location.search).get('code')
 
     if (code) {
-      supabase.auth.exchangeCodeForSession(code).then(() => {
+      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        if (error) {
+          console.error('exchangeCodeForSession error:', error.message)
+        }
         window.location.href = '/'
       })
     } else {
+      console.error('No code in URL:', window.location.href)
       window.location.href = '/'
     }
   }, [])
