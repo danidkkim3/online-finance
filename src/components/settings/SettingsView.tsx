@@ -1,10 +1,12 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '@/lib/store'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Download, Upload, CheckCircle, AlertCircle } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import type { User } from '@supabase/supabase-js'
 
 const CURRENCIES = [
   { symbol: '₩', label: '한국 원 (₩)' },
@@ -19,9 +21,18 @@ const CURRENCIES = [
 
 export function SettingsView() {
   const { settings, updateSettings, assets, debts, loadData } = useStore()
-
   const [customSymbol, setCustomSymbol] = useState('')
   const isCustom = !CURRENCIES.some((c) => c.symbol === settings.currency_symbol)
+  const [user, setUser] = useState<User | null>(null)
+  const supabase = createClient()
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ?? null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   function handleCurrencySelect(symbol: string) {
     setCustomSymbol('')
@@ -91,6 +102,46 @@ export function SettingsView() {
         <h1 className="text-2xl font-bold text-foreground">설정</h1>
         <p className="text-muted-foreground text-sm mt-1">FIRE 목표 및 재무 파라미터는 대시보드에서 바로 수정할 수 있습니다</p>
       </div>
+
+      {/* Account */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="text-base">계정</CardTitle>
+          <CardDescription>로그인하면 데이터가 클라우드에 자동 저장됩니다</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {user ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-foreground">{user.email}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">로그인됨 — 데이터 자동 저장 중</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-red-600 border-red-200 hover:bg-red-50"
+                onClick={async () => {
+                  await supabase.auth.signOut({ scope: 'local' })
+                  window.location.href = '/'
+                }}
+              >
+                로그아웃
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">로그인하지 않음 — 데이터가 이 기기에만 저장됩니다</p>
+              <Button
+                size="sm"
+                className="bg-[#1c1c1e] text-white hover:bg-[#2c2c2e]"
+                onClick={() => { window.location.href = '/auth' }}
+              >
+                로그인
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Currency */}
       <Card className="bg-card border-border">
