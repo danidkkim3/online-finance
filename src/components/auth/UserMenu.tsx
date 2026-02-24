@@ -59,9 +59,10 @@ export function UserMenu() {
     }
   }, [])
 
-  async function handleSignOut() {
-    await supabase.auth.signOut()
-    window.location.href = '/'
+  function handleSignOut() {
+    // Navigate away regardless of whether signOut completes
+    setTimeout(() => { window.location.href = '/' }, 300)
+    supabase.auth.signOut()
   }
 
   if (!user) {
