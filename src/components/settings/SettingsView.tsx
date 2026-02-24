@@ -111,15 +111,20 @@ export function SettingsView() {
         </CardHeader>
         <CardContent>
           {user ? (
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-foreground">{user.email}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">로그인됨 — 데이터 자동 저장 중</p>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#1c1c1e] text-white text-sm font-semibold flex items-center justify-center shrink-0">
+                  {(user.email ?? '?')[0].toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">{user.email}</p>
+                  <p className="text-xs text-green-600 mt-0.5">✓ 클라우드 저장 활성화</p>
+                </div>
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                className="text-red-600 border-red-200 hover:bg-red-50"
+                className="text-red-600 border-red-200 hover:bg-red-50 shrink-0"
                 onClick={async () => {
                   await supabase.auth.signOut({ scope: 'local' })
                   window.location.href = '/'
@@ -129,11 +134,14 @@ export function SettingsView() {
               </Button>
             </div>
           ) : (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">로그인하지 않음 — 데이터가 이 기기에만 저장됩니다</p>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">로그인하지 않음</p>
+                <p className="text-xs text-muted-foreground mt-0.5">데이터가 이 기기에만 저장됩니다</p>
+              </div>
               <Button
                 size="sm"
-                className="bg-[#1c1c1e] text-white hover:bg-[#2c2c2e]"
+                className="bg-[#1c1c1e] text-white hover:bg-[#2c2c2e] shrink-0"
                 onClick={() => { window.location.href = '/auth' }}
               >
                 로그인
