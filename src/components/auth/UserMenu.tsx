@@ -44,11 +44,6 @@ export function UserMenu() {
     }
   }, [])
 
-  async function handleSignOut() {
-    await supabase.auth.signOut({ scope: 'local' })
-    window.location.href = '/'
-  }
-
   return (
     <>
       {/* Save toast */}
@@ -72,12 +67,7 @@ export function UserMenu() {
           <span className="hidden sm:inline">로그인</span>
         </button>
       ) : (
-        <div
-          className="relative"
-          onBlur={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false)
-          }}
-        >
+        <div className="relative">
           <button
             onClick={() => setOpen((v) => !v)}
             className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition"
@@ -94,7 +84,10 @@ export function UserMenu() {
                 <p className="text-xs text-muted-foreground mt-0.5">로그인됨</p>
               </div>
               <button
-                onMouseDown={(e) => { e.preventDefault(); void handleSignOut() }}
+                onClick={async () => {
+                  await supabase.auth.signOut({ scope: 'local' })
+                  window.location.href = '/'
+                }}
                 className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition"
               >
                 <LogOut className="w-4 h-4" />
