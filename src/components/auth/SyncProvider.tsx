@@ -21,8 +21,8 @@ export function SyncProvider() {
 
   useEffect(() => {
     // On mount: check if already logged in and load data
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (data.user) {
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (data.session?.user) {
         loggedIn.current = true
         const remote = await loadUserData(supabase)
         if (remote) loadData(remote)
